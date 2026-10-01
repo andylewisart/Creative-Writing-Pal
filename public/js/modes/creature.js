@@ -50,13 +50,24 @@ export function imgSrc(svg) {
 }
 
 // Show the painting when it matches the creature's current level, unless
-// the writer flipped the card to the other view.
-const showsPainting = (c) => Boolean(c.painting) && (c.view ? c.view === "painting" : c.paintedLevel === c.level);
+// the writer flipped the card to the other view. If painting the new level
+// failed, keep showing the last painting rather than a blank card.
+const showsPainting = (c) => Boolean(c.painting) && (c.view ? c.view === "painting" : c.paintedLevel === c.level || Boolean(c.paintError));
 
 function artHtml(c) {
   if (showsPainting(c)) return `<img src="${esc(c.painting)}" alt="Painting of ${esc(c.name)}">`;
-  if (c.svg) return `<img src="${imgSrc(c.svg)}" alt="Sketch of ${esc(c.name)}">`;
-  return `<div class="no-art">?</div>`;
+  // Older saves can lack a sketch; draw a simple one rather than a blank card.
+  return `<img src="${imgSrc(c.svg || demoCreatureSvg(c.description))}" alt="Sketch of ${esc(c.name)}">`;
+}
+
+// What the banner on a sketch says: how to earn a painting, or (when the
+// writing earned one but the paint failed) why there's no painting yet.
+function sketchBanner(c) {
+  if (artTierFor(c) === "common") return `<div class="sketch-banner"><b>📐 Just a sketch</b><span>${esc(starMessage(countStars(c.details), true))}</span></div>`;
+  if (c.paintError === "refused") return `<div class="sketch-banner"><b>🌀 The paint won't stick!</b><span>It looks too much like a movie monster. Give it a twist!</span></div>`;
+  if (c.paintError === "paint_limit") return `<div class="sketch-banner"><b>🎨 No more paintings today</b><span>Come back tomorrow to paint it!</span></div>`;
+  if (c.paintError) return `<div class="sketch-banner"><b>🎨 The painting didn't work</b><span>Tap "Try painting again"</span></div>`;
+  return "";
 }
 
 // The result screen: the art is the star, details stay compact.
@@ -66,12 +77,10 @@ function heroHtml(c) {
   return `<article class="creature-hero rarity-${esc(c.rarity)}">
     <div class="hero-art">
       ${artHtml(c)}
-      ${
-        !showsPainting(c) && canPaint()
-          ? `<div class="sketch-banner"><b>📐 Just a sketch</b><span>${esc(starMessage(countStars(c.details), true))}</span></div>`
-          : ""
-      }
-      <div class="hero-tags"><span class="hero-rarity">${esc(c.rarity)}</span><span>Lv ${c.level}</span>${tier ? `<span>${tier.icon} ${esc(tier.label)}</span>` : `<span>📐 Sketch</span>`}</div>
+      ${!showsPainting(c) && canPaint() ? sketchBanner(c) : ""}
+      <div class="hero-tags"><span class="hero-rarity">${esc(c.rarity)}</span><span>Lv ${c.level}</span>${
+        tier ? `<span>${tier.icon} ${esc(tier.label)}${c.paintedLevel !== c.level ? ` · from Lv ${c.paintedLevel}` : ""}</span>` : `<span>📐 Sketch</span>`
+      }</div>
       <div class="hero-name"><h1>${esc(c.name)}</h1><span>${ELEMENT_ICON[c.element] || "✨"} ${esc(c.species)}</span></div>
     </div>
     <div class="hero-stats">${stat("HP", c.hp)}${stat("ATK", c.attack)}${stat("DEF", c.defense)}${stat("MAGIC", c.magic)}</div>
@@ -150,9 +159,10 @@ async function paintInto(c, intro) {
   }
 }
 
-// The sketch is needed when there's no painting; draw a simple one locally
-// if the AI skipped it.
-const withSketch = (c) => (c.svg || c.painting ? c : { ...c, svg: demoCreatureSvg(c.description) });
+// A sketch is needed whenever this level has no painting (a creature that
+// earned a painting skips the AI sketch, so if the paint fails, draw a simple
+// one locally). Never leave the card blank.
+const withSketch = (c) => (c.svg || (c.painting && c.paintedLevel === c.level) ? c : { ...c, svg: demoCreatureSvg(c.description) });
 
 const rarityCheer = { rare: "RARE", epic: "EPIC", legendary: "LEGENDARY" };
 
