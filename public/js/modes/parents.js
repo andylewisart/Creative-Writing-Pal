@@ -7,6 +7,7 @@ import { IS_STATIC_SITE, getKeys, setKeys, maskKey } from "../keys.js";
 import { sessions, summaryLine, describe, buildReport } from "../report.js";
 import { clearLog } from "../log.js";
 import { esc, el, $ } from "../ui.js";
+import { speak } from "../fx.js";
 
 let root, nav;
 
@@ -101,6 +102,12 @@ async function dashboard() {
       <p class="p-note" id="ai-status">Checking...</p>
       ${IS_STATIC_SITE ? connectHtml() : ""}
 
+      <div class="danger-zone">
+        <button class="btn btn-small btn-ghost" type="button" id="test-voice">🔊 Test the read-aloud voice</button>
+      </div>
+      <p class="p-note" id="voice-note" role="status"></p>
+      <p class="p-note">Version: ${typeof __BUILD__ !== "undefined" ? esc(__BUILD__) : "local"}</p>
+
       <h2>How the game teaches</h2>
       <div class="p-how">
         <p><b>Detail earns power.</b> Every mode rewards the same eight craft moves ("spells"): sensory detail, sound words, dialogue, feelings, comparisons, strong verbs, and twists. Gems, Sparky's growth, and creature stats all come from using them.</p>
@@ -144,6 +151,23 @@ async function dashboard() {
   });
 
   wireActivity();
+  $("#test-voice", root).addEventListener("click", () => {
+    const note = $("#voice-note", root);
+    let fellBack = false;
+    note.textContent = "Getting the voice ready...";
+    speak("Hi! I'm Sparky. Get ready for an adventure... KABOOM!", {
+      onfallback: (code, msg) => {
+        fellBack = true;
+        note.textContent =
+          code === "no_key"
+            ? "This device has no OpenAI key, so it uses the basic built-in voice. Add the key under AI connection."
+            : `OpenAI's voice didn't work on this device (${code}${msg ? `: ${msg}` : ""}), so the basic built-in voice is reading instead. If the key is a restricted project key, give it access to Audio / Text-to-speech on platform.openai.com.`;
+      },
+      onstart: () => {
+        if (!fellBack) note.textContent = "Playing OpenAI's storyteller voice ✅";
+      },
+    });
+  });
   if (IS_STATIC_SITE) wireConnect();
   await detectBackend();
   const status = $("#ai-status", root);

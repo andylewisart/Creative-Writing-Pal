@@ -80,11 +80,14 @@ let playId = 0; // bumps on every new speak/stop, so stale chunks never play
 
 export const canSpeak = () => "speechSynthesis" in window || canSpeakAI();
 
-// Split long text into chunks the speech API accepts, on sentence breaks.
-function chunks(text, max = 1500) {
+// Split text into speech chunks on sentence breaks. The first chunk is
+// short (a sentence or two) so the voice starts within a couple of seconds;
+// later chunks are prepared while earlier ones play.
+function chunks(text, first = 220, rest = 1200) {
   const parts = [];
   let cur = "";
   for (const sentence of String(text).split(/(?<=[.!?])\s+/)) {
+    const max = parts.length ? rest : first;
     if ((cur + " " + sentence).length > max && cur) {
       parts.push(cur);
       cur = sentence;
@@ -92,6 +95,13 @@ function chunks(text, max = 1500) {
   }
   if (cur) parts.push(cur);
   return parts;
+}
+
+// Start preparing the opening of `text` now (e.g. when a chapter appears),
+// so "Read to me" can start right away.
+export function prefetchSpeech(text, style = "story") {
+  if (!canSpeakAI() || !text) return;
+  chunks(text).slice(0, 2).forEach((part) => audioFor(part, style).catch(() => {}));
 }
 
 async function audioFor(text, style) {
@@ -116,11 +126,14 @@ function browserSpeak(text, { style, onend }) {
   speechSynthesis.speak(u);
 }
 
-// speak(text, { style: "story" | "trailer", onstart, onend })
-export async function speak(text, { style = "story", onstart, onend } = {}) {
+// speak(text, { style: "story" | "trailer", onstart, onend, onfallback })
+// onfallback(code, message) runs if OpenAI's voice failed and the browser
+// voice is used instead.
+export async function speak(text, { style = "story", onstart, onend, onfallback } = {}) {
   stopSpeaking();
   const id = ++playId;
   if (!canSpeakAI() || !player) {
+    onfallback?.("no_key", "No OpenAI key on this device");
     onstart?.();
     return browserSpeak(text, { style, onend });
   }
@@ -145,7 +158,8 @@ export async function speak(text, { style = "story", onstart, onend } = {}) {
   } catch (e) {
     if (id !== playId) return;
     if (e?.name === "NotAllowedError") return onend?.(); // the browser blocked autoplay; the button still works
-    logEvent("readaloud.fallback", { code: e?.code || e?.name || "error" });
+    logEvent("readaloud.fallback", { code: e?.code || e?.name || "error", msg: e?.message });
+    onfallback?.(e?.code || e?.name || "error", e?.message || "");
     onstart?.();
     browserSpeak(text, { style, onend });
   }

@@ -1,10 +1,10 @@
 // Story Quest: the writer and Sparky take turns writing an adventure.
 
 import { get, update, award, countWords } from "../state.js";
-import { ask, kidMessage } from "../ai.js";
+import { ask, kidMessage, detectBackend } from "../ai.js";
 import { WORLDS, HERO_KINDS, POWER_IDEAS } from "../worlds.js";
 import { esc, el, $, $$, writingDesk, wireDesk, showReward, challengeHtml, loadingHtml, spellChip, sparkyHtml, toast } from "../ui.js";
-import { sfx, speak, stopSpeaking, canSpeak, confetti } from "../fx.js";
+import { sfx, speak, stopSpeaking, canSpeak, confetti, prefetchSpeech } from "../fx.js";
 import { spellById } from "../spells.js";
 import { splitSentences } from "../demo.js";
 import { logEvent } from "../log.js";
@@ -224,6 +224,8 @@ function writeTurn(draftText = "") {
   // Show the newest chapter, then the writing box.
   const pages = $$(".page", root);
   pages[pages.length - 1]?.scrollIntoView({ block: "start", behavior: "smooth" });
+  const newest = [...q.story].reverse().find((p) => p.author === "ai");
+  detectBackend().then(() => prefetchSpeech(newest?.text));
   if (get().settings.readAloud && q.justArrived && canSpeak()) {
     q.justArrived = false;
     $$(".read-btn", root).pop()?.click();

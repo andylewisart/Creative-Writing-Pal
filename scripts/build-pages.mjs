@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 import { build } from "esbuild";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,14 +21,18 @@ await build({
   format: "iife",
   minify: true,
   target: "es2020",
-  define: { __STATIC_SITE__: "true" },
+  define: { __STATIC_SITE__: "true", __BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC") },
   outfile: path.join(out, "app.js"),
 });
 
 fs.copyFileSync(pub("css/style.css"), path.join(out, "css/style.css"));
+// Version the file names so a refresh always loads the newest game
+// (GitHub Pages lets browsers reuse files for 10 minutes).
+const hash = (f) => crypto.createHash("sha1").update(fs.readFileSync(path.join(out, f))).digest("hex").slice(0, 10);
 const html = fs
   .readFileSync(pub("index.html"), "utf8")
-  .replace('<script type="module" src="js/main.js"></script>', '<script src="app.js" defer></script>');
+  .replace('<script type="module" src="js/main.js"></script>', `<script src="app.js?v=${hash("app.js")}" defer></script>`)
+  .replace('href="css/style.css"', `href="css/style.css?v=${hash("css/style.css")}"`);
 fs.writeFileSync(path.join(out, "index.html"), html);
 fs.writeFileSync(path.join(out, ".nojekyll"), "");
 
