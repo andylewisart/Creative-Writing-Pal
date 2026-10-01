@@ -2,14 +2,17 @@
 // It also powers the instant spell glow while the writer types.
 
 import { SPELLS } from "./spells.js";
-import { detectDetails, rarityFromStars, countStars } from "./details.js";
+import { findFuzzy } from "./picture.js";
+import { detectDetails, rarityFromStars, countStars, STRETCHED } from "./details.js";
 
 const words = (list) => new RegExp(`\\b(${list.join("|")})\\b`, "i");
 
 const COLORS = ["red", "orange", "yellow", "green", "blue", "purple", "pink", "black", "white", "gold", "golden", "silver", "brown", "gray", "grey", "rainbow", "teal", "violet", "crimson"];
 const DETECTORS = {
-  sight: words([...COLORS, "huge", "tiny", "giant", "enormous", "gigantic", "massive", "little", "spiky", "pointy", "round", "glowing", "sparkly", "shiny", "striped", "spotted", "fluffy", "scaly", "sparkling", "glittering"]),
-  sound: /\b(k?a?boom|crash|bang|whoosh|hiss|hissed|roar|roared|buzz|buzzed|pop|zap|splash|crack|thud|growl|growled|beep|rumble|rumbled|screech|sizzle|sizzled|clang|ding|honk|squeak|squeaked|thump|snap|pow|wham|bam|vroom|sound|sounded|loud|quiet|whisper|hum|hummed)\b/i,
+  // Picture test: plain size words ("big", "huge") and plain sound words
+  // ("roared", "loud") don't count; colors, shapes, and real sound words do.
+  sight: words([...COLORS, "spiky", "pointy", "round", "glowing", "sparkly", "shiny", "striped", "spotted", "fluffy", "scaly", "sparkling", "glittering", "red-hot"]),
+  sound: /\b(k?a?boom|crash|bang|whoosh|hiss|hissed|buzz|buzzed|pop|zap|splash|crack|thud|beep|rumble|rumbled|screech|sizzle|sizzled|clang|ding|honk|squeak|squeaked|thump|snap|pow|wham|bam|vroom|hum|hummed|sounded like|sounds like|(roar|roared|growl|growled) like)\b/i,
   senses: /\b(smell|smelled|smelly|stink|stinky|stank|taste|tasted|sweet|sour|salty|sticky|slimy|fuzzy|soft|rough|cold|freezing|hot|warm|wet|smooth|prickly|squishy|gooey|crunchy|itchy|bumpy)\b|\bfelt (soft|rough|cold|hot|warm|wet|smooth|sticky|slimy|fuzzy|squishy|bumpy|prickly)\b/i,
   talk: /["“”]|\b(said|shouted|yelled|whispered|asked|screamed|cried|called|replied|exclaimed)\b/i,
   feelings: /\b(happy|sad|scared|afraid|nervous|excited|angry|mad|brave|worried|surprised|proud|lonely|grumpy|terrified|joyful|curious|confused|embarrassed|furious|thought|wondered|hoped|wished)\b/i,
@@ -25,7 +28,7 @@ const SHOUTED_SOUND = /\b[A-Z]{3,}!/;
 export function detectSpells(text) {
   const found = [];
   for (const spell of SPELLS) {
-    const m = String(text || "").match(DETECTORS[spell.id]) || (spell.id === "sound" ? String(text || "").match(SHOUTED_SOUND) : null);
+    const m = String(text || "").match(DETECTORS[spell.id]) || (spell.id === "sound" ? String(text || "").match(SHOUTED_SOUND) || String(text || "").match(STRETCHED) : null);
     if (m) found.push({ id: spell.id, quote: quoteAround(text, m.index, m[0].length) });
   }
   return found;
@@ -40,6 +43,13 @@ function quoteAround(text, index, len) {
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const missing = (found) => SPELLS.filter((s) => !found.some((f) => f.id === s.id));
 const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
+
+// Sparky's spoken tip: name a fuzzy bit and ask how to make it specific.
+function tipFor(text, found) {
+  const f = findFuzzy(text, 1)[0];
+  if (f) return `"${f.quote}"? I can't picture that yet! ${f.ask} Put it right in your sentence!`;
+  return `Ooh, I like it! ${challengeFor(found).prompt}`;
+}
 
 function challengeFor(found) {
   const s = pick(missing(found).length ? missing(found) : SPELLS);
@@ -179,6 +189,8 @@ export function demoReply(task, p) {
         cheer: cheerFor(p.kidText, found, name),
         spells: found,
         bonusDone: found.some((f) => f.id === p.bonus?.spell),
+        fuzzy: findFuzzy(p.kidText, 3).map((f) => f.quote),
+        tip: tipFor(p.kidText, found),
         powerUp: { ...challengeFor(found), target: splitSentences(p.kidText)[0] || p.kidText },
       };
     }
@@ -247,6 +259,7 @@ export function demoReply(task, p) {
         score,
         cheer: found.length ? `"${found[0].quote}" made my scales stand up! That's EPIC!` : "Ooh, it's warming up! Add a detail to make it explode with epicness!",
         spells: found,
+        tip: tipFor(p.attempt, found),
         announcer: pick(["In a world where nothing is boring...", "This summer... one sentence... changes everything.", "Get ready for the most epic moment of all time..."]),
         nextSpell: challengeFor(found),
       };
@@ -279,6 +292,7 @@ export function demoReply(task, p) {
           : words > 15
             ? "I drew every detail I could find. The more you tell me, the cooler it gets!"
             : "I had to guess almost everything, so I drew a plain blob. Tell me more!",
+        tip: tipFor(description, found),
         upgradeQuestion: pick(["Does it have wings, horns, spikes, or a tail?", "What color is it, and does any part glow?", "How many eyes does it have?", "What is its special power?"]),
         svg: demoCreatureSvg(description),
       };

@@ -98,13 +98,14 @@ export function rankFor(count) {
   return RANKS.find((r) => count >= r.min) || null;
 }
 
-// Story power: the spells in the writer's part decide how exciting the
-// next chapter is, so interesting writing visibly earns interesting story.
+// Story power: the spells in the writer's part (judged with the picture
+// test, so "really loud" doesn't count) decide how exciting the next
+// chapter is, so interesting writing visibly earns interesting story.
 export const POWER = [
   { id: "tiny", min: 0, icon: "🕯️", label: "Tiny" },
   { id: "spark", min: 1, icon: "⚡", label: "Spark" },
-  { id: "blaze", min: 2, icon: "🔥", label: "Blaze" },
-  { id: "mega", min: 3, icon: "🌋", label: "MEGA" },
+  { id: "blaze", min: 3, icon: "🔥", label: "Blaze" },
+  { id: "mega", min: 5, icon: "🌋", label: "MEGA" },
 ];
 export const powerById = Object.fromEntries(POWER.map((p) => [p.id, p]));
 

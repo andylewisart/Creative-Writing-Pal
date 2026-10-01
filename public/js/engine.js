@@ -22,6 +22,11 @@ export const SPEECH_STYLES = {
     instructions:
       "You are reading an adventure story aloud to an 8-year-old who loves monsters, dinosaurs, and space battles. Use a warm, lively storyteller voice with real drama: build suspense at cliffhangers, make sound words like KABOOM and ROAR punchy, and give characters a little voice when they speak. Clear and not rushed.",
   },
+  coach: {
+    voice: "marin",
+    instructions:
+      "You are Sparky, a playful young dragon coaching an 8-year-old writer. Excited and warm, like a fun older friend: quick and bouncy, but say the writer's quoted words and the two choices clearly, with a little drama on sound words like ROOOAR.",
+  },
   trailer: {
     voice: "onyx",
     instructions: "Deep, booming movie-trailer announcer. Slow and epic, with dramatic pauses, like the biggest blockbuster of the year.",

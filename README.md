@@ -21,11 +21,28 @@ Kids whose writing is short and literal usually don't need correcting. They need
 
 Spells light up while the child types. The AI then confirms which ones they really cast, quoting the child's own words back to them. Each spell earns gems and fills a page of the Spellbook, with Bronze, Silver, and Gold ranks.
 
+### The picture test: plain writing gets plain results
+
+Every judgment in the game (spells, story power, Creature Lab stars, Epic-o-meter scores) is made by the AI with one rule: **a detail only counts if a reader can see or hear something specific.**
+
+- Fuzzy words don't count: big, huge, loud, really, very, super, cool, awesome, scary, fast. "He roared really loud" names a sound, but nobody can hear it. "ROOOAR!", "roared like a jet engine", or "roared so loud the windows shattered" passes.
+- Naming an event isn't describing it: "Godzilla transformed into fire Godzilla" is a fun idea, but what does fire Godzilla look like?
+- Simple but specific passes: "red fire", "three eyes", "BOOM!", "Max was scared".
+- Spelling never counts against the child.
+
+For example, "Godzilla tranformd into fire godzilla and blue evreyon away. He rord rely loud" earns **no spells** (🕯️ Tiny power). Sparky quotes back the three fuzzy bits and asks what fire Godzilla looks like. "Godzillas scales turned red hot and flames shot out of his back spikes. He let out a ROOOAR that shatterd every window in the city. Max yelled "Hold on!" and zoomed his silver ship under Godzillas tail" earns four (🔥 Blaze).
+
+How the child finds out what to fix:
+
+- **While typing:** a hint under the writing box points at a fuzzy word, with a question: 🔍 "rord rely loud" is fuzzy. How loud? What does it sound like?
+- **After sending:** the AI lists the fuzzy words (🔍 Fuzzy: "rord rely loud"), and **Sparky says a tip out loud** whenever the writing misses the mark (Tiny or Spark story power, a sketch-only creature, or an Epic score under 7). The tip names one fuzzy bit and offers two vivid choices ("Does it go ROOOAAAR, or rumble like a truck?"). A 🔊 **Sparky's tip** button replays it. Grown-ups can turn spoken tips off.
+- **Talking it out:** the voice coach follows the same test. If the child answers "really loud", Sparky doesn't call it great. He offers two or three vivid ways to say it and lets the child pick or invent one; if they repeat themselves, he switches to an easy either/or.
+
 ## Game modes
 
 - **🗺️ Story Quest**: pick a world (Kaiju Coast, Galaxy Rebellion, Dino Island, Dragon Kingdom...) and invent a hero. The AI writes a chapter that ends on a cliffhanger, the child writes what happens next, and they take turns. After each turn comes a **power-up**: Sparky picks **one sentence the child wrote** and asks one question about it ("What color is Godzilla's fire?"). The child edits that sentence in place, with a quick before/after example of the move ("The ship landed." → "The **silver, spiky** ship landed."). If they tack the detail on the end instead ("Fire Godzilla came from the ground. Red Fire"), Sparky celebrates the detail and offers a fill-in-the-blank frame built from their sentence ("Fire Godzilla burst from the ground, blasting ___ fire.") for one more try. Finished stories become books in the library.
 
-  **Story power:** the spells in the child's part decide how exciting the next chapter is: 0 spells → 🕯️ Tiny (2–3 plain sentences, nothing much happens), 1 → ⚡ Spark (a small surprise), 2 → 🔥 Blaze (an exciting new event or creature), 3+ → 🌋 MEGA (a big twist and an epic cliffhanger). A power line under the writing box updates as they type ("⚡ Spark power · 1 more spell for a 🔥 Blaze chapter!"), the reward names the power they earned, a power-up that adds a spell boosts it, and every chapter wears a badge, so plain writing visibly gets a plain chapter.
+  **Story power:** the spells in the child's part (judged with the picture test) decide how exciting the next chapter is: 0 spells → 🕯️ Tiny (2–3 plain sentences, nothing much happens), 1–2 → ⚡ Spark (a small surprise), 3–4 → 🔥 Blaze (an exciting new event or creature), 5+ → 🌋 MEGA (a big twist and an epic cliffhanger). A power line under the writing box updates as they type ("⚡ Spark power · 2 more spells for a 🔥 Blaze chapter!"), the reward names the power they earned, a power-up that adds a spell boosts it, and every chapter wears a badge, so plain writing visibly gets a plain chapter.
 - **⚡ Boring-to-EPIC**: the Boring-o-Tron 3000 shows a dull sentence ("The dog ran."). The child rewrites it and the Epic-o-meter scores it 1–10. Gems come only from beating your own best, so the fun is in revising. A movie-trailer voice reads the result aloud.
 - **🐲 Creature Lab**: describe a creature and get a collectible trading card with an AI drawing. The catch is that **the artist draws only what you write**. "A monster" gets you a plain blob; "purple scales, three glowing eyes, and bat wings" gets you a real beast with higher stats. Evolve the creature by answering the artist's question.
 
@@ -126,7 +143,7 @@ The artist needs six things, shown as **detail stars**: ⭐ Body, Colors, Parts 
 | 4–5 | Epic | 🎬 a movie-poster painting |
 | 6 | Legendary | 🏆 the most epic cinematic reveal |
 
-- The AI decides which stars were really earned, quoting the child's words for each; the rarity follows the count, so the reward always matches the stars shown.
+- The AI decides which stars were really earned, quoting the child's words for each; the rarity follows the count, so the reward always matches the stars shown. Stars follow the picture test: "it is big" doesn't earn Body ("as tall as a skyscraper" does), "it roars" doesn't earn Sounds ("SKREEEE!" does), and "it has powers" doesn't earn Powers ("it shoots ice lasers" does).
 - Rare and better go **straight to painting**, with no sketch first (and the model skips drawing an SVG, which saves time).
 - **Evolving means improving the whole description**: the result screen shows the child's own description in an editable box ("it is a big monster" → "it is a big purple monster with bat wings that roars"). Stars light up for new words as they edit, the message says what they'll unlock, and one hint question points at a missing star.
 - The painting prompt uses only the child's own words: anything they didn't describe stays plain.
@@ -141,7 +158,7 @@ Tap **Grown-ups corner** on the home screen. A quick multiplication question kee
 - average words per story turn, first five vs. latest five
 - a chart of recent writing lengths
 - which spells your child uses most
-- settings: story length, sound, read-aloud, writer name
+- settings: story length, sound, read-aloud, spoken tips, voice coach, writer name
 
 ## Project layout
 
@@ -158,6 +175,7 @@ public/js/voice.js        the voice coach (OpenAI realtime over WebRTC)
 public/js/log.js          the activity log (this device only)
 public/js/report.js       turns the log into sessions, timelines, and the copyable report
 public/js/demo.js         practice-mode magic + live spell lights
+public/js/picture.js      the live picture-test hint (spots fuzzy words while typing)
 public/js/state.js        saved progress (browser localStorage), gems, Sparky's levels
 public/js/modes/*.js      quest, epic, creature, library, grown-ups screens
 scripts/build-artifact.mjs  bundles everything into one HTML file (legacy claude.ai artifact)

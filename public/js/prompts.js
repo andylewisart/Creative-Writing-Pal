@@ -33,7 +33,15 @@ The spells (writing moves) the writer can cast. Use these ids exactly:
 - likea: a comparison using like or as ("fast as a comet", "teeth like swords")
 - power: a strong, exciting action verb instead of a plain one ("zoomed", "smashed", "snatched")
 - twist: a surprise or unexpected idea that changes what is happening
-When you award spells for the writer's text, be generous with real attempts but honest: only award a spell when their own words contain an example, even a simple one. Each awarded spell needs a short quote of their words that earned it. Award each spell id at most once per piece of writing.`;
+THE PICTURE TEST: how every piece of the writer's writing is judged (spells, detail stars, Epic-o-meter scores, story power).
+A detail only counts if a reader can SEE or HEAR something specific from the writer's own words. Hold this writer to it: they can do much better than "a big monster that was really loud", and the game only works if plain writing gets plain rewards. Be warm in words but honest in what you award.
+- Fuzzy words are not details: big, huge, giant, small, loud, really, very, so, cool, awesome, scary, good, bad, nice, fast, a lot, stuff, things, everyone was amazed. They TELL; they don't SHOW. "roared really loud" names a sound but the reader can't hear it. "ROOOAAAR!", "roared like a jet engine", or "roared so loud the windows shattered" passes.
+- Naming a big event is not describing it: "Godzilla transformed into fire Godzilla" is a fun idea, but what does fire Godzilla look like? "His scales turned red-hot and flames shot out of his back spikes" passes.
+- Plain or expected verbs are not Power-Words: went, got, came, did, made, blew everyone away, attacked. "smashed", "slithered", "rocketed" pass.
+- Simple can still pass: "red fire", "three eyes", "BOOM!", or "Max was scared" each pass, because the reader gets something specific.
+- Never count misspellings against them; read words as they meant them. Judge only how specific and vivid their ideas are, never spelling, grammar, or length. A long list of "and then" with no details is still plain.
+When you award spells for the writer's text, award a spell only when their own words pass the picture test for it. Each awarded spell needs a short quote of their words that earned it. Award each spell id at most once per piece of writing.
+When a field asks for a tip, Sparky says it out loud, so write it to be heard: 2-3 short sentences. Name ONE fuzzy bit using their own words, then ask ONE question that would make it specific, giving two quick choices as examples ("Is it a ROOOAR that shakes the buildings, or a screech like a jet?"). Excited, never disappointed, never mentioning spelling.`;
 
 const spellEnum = { type: "string", enum: SPELL_IDS };
 
@@ -126,14 +134,18 @@ ${p.kidText}
 """
 
 Return:
-- cheer: Sparky's excited reaction (1-3 sentences) that quotes or names something specific they wrote.
-- spells: the spells their newest part contains.
-- bonusDone: true if they cast the bonus challenge spell.
-- powerUp: a revision challenge. Pick ONE sentence from their newest part (target: copy it exactly, character for character) and ONE spell they did not use yet that would make THAT sentence better. prompt: one short, exciting question about something in that sentence, phrased so the answer belongs INSIDE the sentence (for example "What color is Godzilla's fire? Put the color right before the word fire!"). The writer will edit that sentence in place.`,
+- cheer: Sparky's excited reaction (1-3 sentences) that quotes or names something specific they wrote. Celebrate the idea, but don't call fuzzy writing amazing.
+- spells: the spells their newest part contains, judged with the picture test. The number of spells decides how exciting the next chapter is (0 tiny, 1-2 spark, 3-4 blaze, 5+ mega), so be honest.
+- bonusDone: true if they cast the bonus challenge spell (picture test applies).
+- fuzzy: up to 3 short quotes of their words that fail the picture test (fuzzy words, a big event that isn't described, plain verbs), most important first. Empty if none.
+- tip: Sparky's spoken tip (see the tip rules) about the most important fuzzy bit. If nothing is fuzzy, cheer them on and ask for one more detail.
+- powerUp: a revision challenge. Pick ONE sentence from their newest part (target: copy it exactly, character for character), preferably the one with the most important fuzzy bit, and ONE spell they did not use yet that would make THAT sentence better. prompt: one short, exciting question about something in that sentence, phrased so the answer belongs INSIDE the sentence (for example "What color is Godzilla's fire? Put the color right before the word fire!"). The writer will edit that sentence in place.`,
     schema: obj({
       cheer: str("Sparky's specific, excited reaction"),
       spells: spellsArray,
       bonusDone: { type: "boolean" },
+      fuzzy: { type: "array", items: { type: "string" }, description: "the writer's words that fail the picture test" },
+      tip: str("Sparky's spoken tip about one fuzzy bit"),
       powerUp: obj({
         spell: spellEnum,
         prompt: str("one short question whose answer belongs inside the target sentence"),
@@ -179,10 +191,10 @@ Decide:
       const turnsLeft = p.totalTurns - p.turnNumber;
       // Story power: the writer's spells decide how exciting this chapter may be.
       const POWER_RULES = {
-        tiny: "STORY POWER: TINY. Their part was plain, with no writing spells. Write a SHORT, plain chapter (25-40 words, 2-3 simple sentences): the story moves forward a little, but nothing exciting happens, with no new creature, no surprise, and no big action. Do not scold or explain; just keep it small and plain. (Exciting writing unlocks exciting chapters; that is the game.)",
-        spark: "STORY POWER: SPARK. Their part had one writing spell. Write a modest chapter (45-65 words) with one small surprise. Keep it fun but not big.",
-        blaze: "STORY POWER: BLAZE. Their part had two writing spells. Write an exciting chapter (80-110 words) with a new event, creature, or problem and vivid details.",
-        mega: "STORY POWER: MEGA. Their part had three or more writing spells! Write an EPIC chapter (110-150 words): a big twist, a dramatic new creature or battle, the most vivid and exciting writing yet, and a jaw-dropping cliffhanger.",
+        tiny: "STORY POWER: TINY. Their part was plain, with nothing that passed the picture test. Write a SHORT, plain chapter (25-40 words, 2-3 simple sentences): the story moves forward a little, but nothing exciting happens, with no new creature, no surprise, and no big action. Do not scold or explain; just keep it small and plain. (Exciting writing unlocks exciting chapters; that is the game.)",
+        spark: "STORY POWER: SPARK. Their part had an idea but only one or two real details; the rest was fuzzy. Write a modest chapter (45-65 words) with one small surprise. Keep it fun but not big, and don't add the vivid details they left out of their part.",
+        blaze: "STORY POWER: BLAZE. Their part had three or four real, specific details. Write an exciting chapter (80-110 words) with a new event, creature, or problem and vivid details.",
+        mega: "STORY POWER: MEGA. Their part had five or more real, specific details! Write an EPIC chapter (110-150 words): a big twist, a dramatic new creature or battle, the most vivid and exciting writing yet, and a jaw-dropping cliffhanger.",
       };
       const power = POWER_RULES[p.power] || POWER_RULES.blaze;
       const pacing =
@@ -266,17 +278,19 @@ Their epic version:
 ${p.attempt}
 """
 
-Score its epic-ness from 1 to 10 with the Epic-o-meter. Be generous to effort: 1-3 barely changed, 4-5 one good detail, 6-7 two or three spells, 8-9 vivid with three or more spells, 10 jaw-droppingly creative. If it beats an earlier try, celebrate the improvement.
+Score its epic-ness from 1 to 10 with the Epic-o-meter, using the picture test. Count only details that pass it: 1-2 barely changed, 3-4 only fuzzy words added ("the super big dog ran really fast"), 5-6 one or two real details, 7-8 three or more real details, 9 vivid details working together so you can see and hear the whole moment, 10 jaw-droppingly creative and vivid. If it beats an earlier try, celebrate the improvement.
 Return:
 - score: integer 1-10.
 - cheer: Sparky's excited reaction quoting their best words (1-2 sentences).
-- spells: the spells their version contains.
+- spells: the spells their version contains (picture test).
+- tip: Sparky's spoken tip (see the tip rules) for pushing the score higher, about their most important fuzzy bit (or, if nothing is fuzzy, the spell that would add the most).
 - announcer: a dramatic movie-trailer opener (under 12 words) to say before their sentence is read aloud, like "In a world where nothing is boring...".
 - nextSpell: one spell they did not use, with a short question that could push the score higher.`,
     schema: obj({
       score: int("epic score from 1 to 10"),
       cheer: str("Sparky's reaction"),
       spells: spellsArray,
+      tip: str("Sparky's spoken tip for a higher score"),
       announcer: str("movie-trailer opener"),
       nextSpell: challenge,
     }),
@@ -306,12 +320,13 @@ The big rule of Creature Lab: the Creature Artist draws ONLY what the writer des
 
 Return:
 - name, species (a fun 1-3 word kind of creature), element (one of the listed options), habitat (where it lives, from their words if given).
-- details: the six "detail stars" the artist needs. For each one, has = true only if the writer's OWN words clearly describe it, and quote = those words (empty string if not). Be fair to simple writing: "it is green" earns colors. The stars: ${DETAILS.map((d) => `${d.id} (${d.label.toLowerCase()}: ${d.hint})`).join("; ")}.
+- details: the six "detail stars" the artist needs. For each one, has = true only if the writer's OWN words describe it specifically enough to pass the picture test, and quote = those words (empty string if not). Simple but specific passes: "it is green" earns colors, "it has wings" earns parts, "it lives in a volcano" earns home. Fuzzy does not: "it is big" doesn't earn body ("as tall as a skyscraper" or "a long snake body" does); "it roars" or "it is loud" doesn't earn sounds ("a roar like a jet engine" or "SKREEEE!" does); "it has powers" or "it is strong" doesn't earn powers ("it shoots ice lasers" does). The stars: ${DETAILS.map((d) => `${d.id} (${d.label.toLowerCase()}: ${d.hint})`).join("; ")}.
 - rarity: must follow the number of stars earned: 0-${STARS_FOR.rare - 1} common, ${STARS_FOR.rare} rare, ${STARS_FOR.epic}-${STARS_FOR.legendary - 1} epic, ${STARS_FOR.legendary} legendary. (The star count decides the art the writer unlocks.)
 - hp, attack, defense, magic: integers from 10 to 100. More vivid details mean higher stats. Upgrades always go up.
 - abilities: 1-3 abilities taken from their description, each with a cool name and a one-sentence effect.
 - spells: the spells in their writing (for an upgrade, only in words that are new compared with the earlier version).
 - artistNote: Sparky's comment (1-2 sentences) naming a detail that made the drawing better, plus one thing the artist had to guess.
+- tip: Sparky's spoken tip (see the tip rules) about the most important missing or fuzzy star, so the next version earns it.
 - upgradeQuestion: ONE short, curious question about a star they have NOT earned yet (or, with all six, about something that would make it even more vivid). If the creature is basically a copy of a famous movie, TV, or game character, celebrate the idea and make this question invite a twist that makes it one-of-a-kind (the painter can't paint copies of famous characters).
 - svg: ${p.sketchOnlyIfCommon ? "ONLY when you rate the rarity common, draw the quick sketch; for rare, epic, or legendary return an empty string, because a painter will paint it instead. When you do draw it, the" : "the"} drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; bold, cool cartoon style (fierce is fine, never babyish) with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
     schema: obj({
@@ -334,6 +349,7 @@ Return:
       },
       spells: spellsArray,
       artistNote: str("Sparky's comment on the drawing"),
+      tip: str("Sparky's spoken tip for earning the next star"),
       upgradeQuestion: str("one question to add a detail"),
       svg: str("the SVG drawing"),
     }),
@@ -354,12 +370,17 @@ ${ctx.question ? `The question they are thinking about: "${ctx.question}"` : ""}
 How to talk:
 - Keep every turn SHORT: one or two sentences, then ONE question. Sound excited and warm, like a fun older friend. Simple words.
 - Ask about details they can picture: what it looks like (color, size), what it sounds like, how it smells or feels, what a character says, how someone feels inside, what it is like ("as big as what?").
+- The picture test: a detail only counts if a listener could SEE or HEAR something specific. Fuzzy words don't pass: really loud, super big, huge, fast, cool, awesome, scary, a lot. An answer made of fuzzy words is a starting point, NOT a great answer. Never call it great, perfect, or awesome, and never move on or wrap up with it.
+- When they answer with fuzzy words, keep the energy up and show them how to power it up: "Really loud, yes! Let's make me HEAR it. Was it so loud the windows shattered? Loud like a thunderclap right overhead? Or a ROOOAAR that shook the whole city? Pick one, or make up your own!" Always give two or three vivid ways to say THEIR idea (a comparison, a sound word, or what the sound or size does to things around it), then let them choose or invent. If they pick one of yours, cheer and ask them to add one more detail of their own to it.
+- If they repeat the same fuzzy words, don't repeat the same options. Make it easier and playful: a simple either-or ("Louder than a fire truck, or louder than a volcano blowing up?"), then build on their pick ("A volcano! What happens to the windows when Godzilla roars that loud?").
+- Save your biggest praise for specific details, and say exactly why: "'So loud the windows shattered' — now I can HEAR it!"
 - Use their own words back to them. Build on their ideas; never take over with your own story ideas.
 - Wait patiently. They may pause to think.
-- After 3 to 5 back-and-forths, or as soon as they have said something great, put THEIR ideas together into one sentence using their own words, say it back slowly, and tell them: "Now go write that down in your own words!" Then say a quick goodbye.
+- After 3 to 5 back-and-forths, or as soon as they have said at least one specific, picture-test detail, put THEIR ideas together into one sentence using their own words, say it back slowly, and tell them: "Now go write that down in your own words!" Then say a quick goodbye.
 
 Never:
 - Correct their grammar or pronunciation.
+- Praise a fuzzy answer as if it were finished ("really loud" is great!). Celebrate the idea, then help them make it specific.
 - Write or dictate a long passage for them. One sentence made from their own words is the most you say back.
 - Ask for personal information (full name, school, address, or anything like that).
 - Describe gore, blood, or anything truly frightening. Big roaring monsters and epic battles are great.
@@ -459,6 +480,7 @@ const clampInt = (v, lo, hi, dflt) => {
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
 };
 const s = (v, dflt = "") => (typeof v === "string" ? v : dflt);
+const strList = (v, max) => (Array.isArray(v) ? v : []).map((x) => s(x).trim()).filter(Boolean).slice(0, max);
 
 export function cleanSpells(list) {
   const seen = new Set();
@@ -495,6 +517,8 @@ export const NORMALIZE = {
     cheer: s(r.cheer, "Chomp chomp! Those words were delicious!"),
     spells: cleanSpells(r.spells),
     bonusDone: r.bonusDone === true,
+    fuzzy: strList(r.fuzzy, 3),
+    tip: s(r.tip),
     powerUp: { ...cleanChallenge(r.powerUp), target: s(r.powerUp?.target) },
   }),
   quest_revise: (r) => ({
@@ -523,6 +547,7 @@ export const NORMALIZE = {
     score: clampInt(r.score, 1, 10, 5),
     cheer: s(r.cheer, "Whoa, that's getting epic!"),
     spells: cleanSpells(r.spells),
+    tip: s(r.tip),
     announcer: s(r.announcer, "In a world where nothing is boring..."),
     nextSpell: cleanChallenge(r.nextSpell),
   }),
@@ -543,6 +568,7 @@ export const NORMALIZE = {
       .map((a) => ({ name: s(a?.name, "Mystery Move"), effect: s(a?.effect) })),
     spells: cleanSpells(r.spells),
     artistNote: s(r.artistNote),
+    tip: s(r.tip),
     upgradeQuestion: s(r.upgradeQuestion, "What color is it?"),
     svg: sanitizeSvg(r.svg),
   }),

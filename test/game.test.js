@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TASKS, NORMALIZE, fullPrompt, describeShape, sanitizeSvg } from "../public/js/prompts.js";
+import { TASKS, NORMALIZE, GUIDE, fullPrompt, describeShape, sanitizeSvg, voiceInstructions } from "../public/js/prompts.js";
 import { detectSpells, demoReply } from "../public/js/demo.js";
 
 const quest = {
@@ -129,11 +129,11 @@ test("revision prompt and voice instructions keep the teaching rules", async () 
 
 test("detail stars light up from the child's words and set the rarity", async () => {
   const { detectDetails, countStars, rarityFromStars, nextUnlock } = await import("../public/js/details.js");
-  const poor = detectDetails("it is a big monster");
-  assert.equal(countStars(poor), 1);
+  const poor = detectDetails("it is a big monster that roars and has powers");
+  assert.equal(countStars(poor), 0, "fuzzy words don't earn stars");
   assert.equal(rarityFromStars(countStars(poor)), "common");
   assert.deepEqual(nextUnlock(1), { need: 2, icon: "🖌️", label: "a real painting" });
-  const rich = detectDetails("A giant purple monster with orange bat wings. It breathes blue fire, roars like thunder, and lives in a volcano.");
+  const rich = detectDetails("A purple monster as tall as a skyscraper with orange bat wings. It breathes blue fire, roars like thunder, and lives in a volcano.");
   assert.equal(countStars(rich), 6);
   assert.equal(rarityFromStars(6), "legendary");
   const r = NORMALIZE.creature_create({ rarity: "legendary", details: { body: { has: true, quote: "big" } } });
@@ -144,13 +144,46 @@ test("story power: spells decide how exciting the next chapter is", async () => 
   const { powerFor, powerHint } = await import("../public/js/spells.js");
   assert.equal(powerFor(0).id, "tiny");
   assert.equal(powerFor(1).id, "spark");
-  assert.equal(powerFor(2).id, "blaze");
+  assert.equal(powerFor(2).id, "spark");
+  assert.equal(powerFor(3).id, "blaze");
+  assert.equal(powerFor(4).id, "blaze");
   assert.equal(powerFor(5).id, "mega");
-  assert.match(powerHint(1), /1 more spell for a 🔥 Blaze chapter/);
+  assert.match(powerHint(1), /2 more spells for a 🔥 Blaze chapter/);
   const tiny = TASKS.quest_continue.build({ ...quest, power: "tiny" });
   const mega = TASKS.quest_continue.build({ ...quest, power: "mega" });
   assert.match(tiny, /STORY POWER: TINY/);
   assert.match(tiny, /nothing exciting happens/);
   assert.match(mega, /STORY POWER: MEGA/);
   assert.equal(demoReply("quest_continue", { ...quest, power: "tiny" }).chapter.split(/\s+/).length < 20, true);
+});
+
+test("picture test: fuzzy writing is spotted, judged, and coached everywhere", async () => {
+  const { findFuzzy, fuzzyHint } = await import("../public/js/picture.js");
+  const kid = "Godzilla tranformd into fire godzilla and blue evreyon away. He rord rely loud";
+  assert.deepEqual(findFuzzy(kid).map((f) => f.quote), ["rord rely loud"]);
+  assert.match(fuzzyHint(kid), /How loud\? What does it sound like\?/);
+  assert.deepEqual(findFuzzy("It was as big as a bus and bigger than a house."), [], "comparisons pass");
+  // ("blue" for "blew" fools the quick live check; the AI reads it as meant.)
+  assert.equal(detectSpells(kid.replace("blue", "blew")).length, 0, "the live check doesn't count fuzzy words as spells");
+  assert.deepEqual(detectSpells("He roared like a jet. ROOOAR! His red scales glowed.").map((x) => x.id).sort(), ["likea", "sight", "sound"]);
+
+  // Every judging task gets the picture test through the guide.
+  assert.match(GUIDE, /THE PICTURE TEST/);
+  assert.match(GUIDE, /roared really loud/);
+  assert.match(TASKS.quest_react.build({ ...quest, kidText: kid, bonus: {} }), /0 tiny, 1-2 spark, 3-4 blaze, 5\+ mega/);
+  assert.match(TASKS.epic_judge.build({ boring: "The dog ran.", attempt: "The super big dog ran really fast." }), /only fuzzy words added/);
+  assert.match(TASKS.creature_create.build({ description: "it is big" }), /"it is big" doesn't earn body/);
+  for (const t of ["quest_react", "epic_judge", "creature_create"]) assert.ok(TASKS[t].schema.properties.tip, `${t} has a spoken tip`);
+
+  const r = NORMALIZE.quest_react({ fuzzy: ["rord rely loud", 7, ""], tip: "How loud?" });
+  assert.deepEqual(r.fuzzy, ["rord rely loud"]);
+  assert.equal(r.tip, "How loud?");
+  const demo = demoReply("quest_react", { ...quest, kidText: kid, bonus: {} });
+  assert.deepEqual(demo.fuzzy, ["rord rely loud"]);
+  assert.match(demo.tip, /rord rely loud/);
+
+  // The voice coach doesn't accept "really loud" as a great answer.
+  const v = voiceInstructions({ writerName: "Sam", where: "Story Quest" });
+  assert.match(v, /Never call it great/);
+  assert.match(v, /two or three vivid ways/);
 });

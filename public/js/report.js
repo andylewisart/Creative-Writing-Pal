@@ -19,7 +19,7 @@ export function describe(e) {
     case "quest.start": return `Started a Story Quest: ${e.world}, hero ${q(e.hero)} (${e.kind}), power ${q(e.power)}`;
     case "quest.submit": return `WROTE part ${e.turn}/${e.of} (${e.words} words${e.secs ? `, ${e.secs}s` : ""}): ${q(e.text)}`;
     case "quest.too_short": return `Tried to send too little: ${q(e.text)}`;
-    case "quest.react": return `  Sparky: ${q(e.cheer)} | spells: ${spells(e.spells)}${e.bonusDone ? " | bonus done" : ""}`;
+    case "quest.react": return `  Sparky: ${q(e.cheer)} | spells: ${spells(e.spells)}${e.power ? ` | ${e.power} power` : ""}${e.fuzzy?.length ? ` | fuzzy: ${e.fuzzy.map(q).join(", ")}` : ""}${e.bonusDone ? " | bonus done" : ""}`;
     case "powerup.shown": return `  Power-up${e.attempt > 1 ? ` (try ${e.attempt}, with frame ${q(e.frame)})` : ""}: ${q(e.question)} on sentence ${q(e.target)}`;
     case "powerup.try": return `  REVISED try ${e.attempt}: ${q(e.before)} -> ${q(e.after)} => ${!e.changed ? "no change" : e.woven ? "woven in" : "tacked on"}${e.spells?.length ? ` | spells: ${spells(e.spells)}` : ""}`;
     case "powerup.skip": return `  Skipped the power-up (try ${e.attempt}${e.secs ? `, after ${e.secs}s` : ""})`;
@@ -30,9 +30,10 @@ export function describe(e) {
     case "readaloud": return `  Listened to read-aloud`;
     case "readaloud.fallback": return `  !! Read-aloud fell back to the basic voice (${e.code})`;
     case "epic.try": return `EPIC try ${e.tryNo} on ${q(e.boring)}: ${q(e.text)} => ${e.score}/10 (spells: ${spells(e.spells)})`;
+    case "voice.tip": return `  Sparky said a tip out loud (${e.where}): ${q(e.tip)}`;
     case "epic.trailer": return `  Played the movie-trailer voice`;
     case "creature.create": return `CREATURE (${e.words} words, ${e.rarity}): ${q(e.description)}`;
-    case "creature.evolve": return `  Evolved ${e.name} (+${e.words} words, ${e.was} -> ${e.rarity}): ${q(e.addition)}`;
+    case "creature.evolve": return `  Evolved ${e.name} (+${e.words} words, ${e.was} -> ${e.stars} stars, ${e.rarity}): ${q(e.after ?? e.addition)}`;
     case "creature.paint": return `  Painting (${e.tier}): ${e.ok ? "done" : `failed (${e.code})`}`;
     case "voice.start": return `VOICE coach started (${e.where})`;
     case "voice.said": return `  Said out loud: ${q(e.text)}`;

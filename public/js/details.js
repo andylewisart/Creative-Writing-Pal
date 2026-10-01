@@ -28,19 +28,23 @@ export const countStars = (details) => DETAIL_IDS.filter((id) => details?.[id]?.
 // The AI makes the final call when the creature is drawn.
 const COLORS = "red|orange|yellow|green|blue|purple|pink|black|white|gold|golden|silver|brown|gray|grey|rainbow|teal|violet|crimson|glowing|glows|sparkly|shiny|striped|stripes|spotted|spots|neon";
 const PATTERNS = {
-  body: /\b(big|bigger|huge|giant|gigantic|enormous|massive|tiny|small|little|tall|long|short|fat|round|skinny|chubby|size|shaped|shape|body|scales|scaly|fur|furry|fuzzy|skin|slimy|fluffy|feathers|armor)\b/i,
+  // Picture test: "big", "it roars", or "it has powers" alone don't earn a star.
+  body: /\b(as \w+ as|\w+er than|size of|shaped like|round|skinny|chubby|scales|scaly|fur|furry|fuzzy|slimy|fluffy|feathers?|feathery|armor|armored|\d+ (feet|foot|meters|stories) tall)\b/i,
   colors: new RegExp(`\\b(${COLORS})\\b`, "i"),
   parts: /\b(wings?|horns?|tails?|claws?|teeth|tooth|fangs?|eyes?|legs?|arms?|tentacles?|spikes?|spiky|beak|antlers?|fins?|heads|shell|paws?|mouths?|jaws?|hands?|feet|foot|necks?)\b/i,
-  powers: /\b(can|could|power|powers|breathes?|breathing|shoots?|shooting|fires?|zaps?|blasts?|spits?|turns? into|flies|fly|flying|teleports?|invisible|freezes?|magic|lasers?|beams?|explodes?|controls?|super|strong|strength)\b/i,
-  sounds: /\b(roars?|roared|roaring|growls?|screech(es)?|hiss(es)?|howls?|squeaks?|beeps?|booms?|rumbles?|buzz(es)?|chirps?|screams?|says|sounds?|loud|noise|whispers?|shrieks?)\b|\b[A-Z]{3,}!/,
+  powers: /\b(breathes?|breathing|shoots?|shooting|zaps?|blasts?|spits?|turns? into|flies|fly|flying|teleports?|invisible|freezes?|lasers?|beams?|explodes?|controls? (the )?\w+)\b/i,
+  sounds: /\b(screech(es)?|hiss(es)?|howls?|squeaks?|beeps?|booms?|rumbles?|buzz(es)?|chirps?|shrieks?|sounds? like|(roars?|growls?|screams?) like)\b|\b[A-Z]{3,}!/,
   home: /\b(lives?|living|home|cave|volcano|ocean|sea|lake|river|forest|jungle|space|planet|moon|mountains?|swamp|desert|castle|city|underground|island|nest|sky|clouds?|ice|arctic)\b/i,
 };
+
+// A stretched-out sound word: "ROOOAR", "booooom", "SKREEEE".
+export const STRETCHED = /\b[a-z]*([a-z])\1\1[a-z]*\b/i;
 
 export function detectDetails(text) {
   const t = String(text || "");
   return Object.fromEntries(
     DETAIL_IDS.map((id) => {
-      const m = t.match(PATTERNS[id]);
+      const m = t.match(PATTERNS[id]) || (id === "sounds" ? t.match(STRETCHED) : null);
       return [id, { has: Boolean(m), quote: m ? m[0] : "" }];
     }),
   );

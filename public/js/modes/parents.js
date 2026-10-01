@@ -92,6 +92,7 @@ async function dashboard() {
         <select id="set-turns">${[3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${n === s.settings.questTurns ? "selected" : ""}>${n} writing turns</option>`).join("")}</select>
         <label for="set-sound">Sound effects</label><input type="checkbox" id="set-sound" ${s.settings.sound ? "checked" : ""}>
         <label for="set-read">Read new chapters aloud automatically</label><input type="checkbox" id="set-read" ${s.settings.readAloud ? "checked" : ""}>
+        <label for="set-tips">🔊 Sparky says tips out loud when writing is plain</label><input type="checkbox" id="set-tips" ${s.settings.voiceTips !== false ? "checked" : ""}>
         <label for="set-voice">🎙️ Voice coach (needs an OpenAI key and a microphone)</label><input type="checkbox" id="set-voice" ${s.settings.voice !== false ? "checked" : ""}>
         <label for="set-voice-min">Voice coach minutes per day</label>
         <select id="set-voice-min">${[5, 10, 20, 30, 45].map((n) => `<option value="${n}" ${n === (s.settings.voiceMinutes ?? 20) ? "selected" : ""}>${n} minutes</option>`).join("")}</select>
@@ -136,6 +137,7 @@ async function dashboard() {
   $("#set-turns", root).addEventListener("change", (e) => (update((st) => (st.settings.questTurns = Number(e.target.value))), saved()));
   $("#set-sound", root).addEventListener("change", (e) => (update((st) => (st.settings.sound = e.target.checked)), saved()));
   $("#set-read", root).addEventListener("change", (e) => (update((st) => (st.settings.readAloud = e.target.checked)), saved()));
+  $("#set-tips", root).addEventListener("change", (e) => (update((st) => (st.settings.voiceTips = e.target.checked)), saved()));
   $("#set-voice", root).addEventListener("change", (e) => (update((st) => (st.settings.voice = e.target.checked)), saved()));
   $("#set-voice-min", root).addEventListener("change", (e) => (update((st) => (st.settings.voiceMinutes = Number(e.target.value))), saved()));
   $("#reset", root).addEventListener("click", () => {

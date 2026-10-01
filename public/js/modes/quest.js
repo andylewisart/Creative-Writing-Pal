@@ -3,13 +3,14 @@
 import { get, update, award, countWords } from "../state.js";
 import { ask, kidMessage, detectBackend } from "../ai.js";
 import { WORLDS, HERO_KINDS, POWER_IDEAS } from "../worlds.js";
-import { esc, el, $, $$, writingDesk, wireDesk, showReward, challengeHtml, loadingHtml, spellChip, sparkyHtml, toast } from "../ui.js";
+import { esc, el, $, $$, writingDesk, wireDesk, showReward, challengeHtml, loadingHtml, spellChip, sparkyHtml, toast, speakTip, fuzzyHtml, wireTipButtons } from "../ui.js";
 import { sfx, speak, stopSpeaking, canSpeak, confetti, prefetchSpeech } from "../fx.js";
 import { spellById, powerFor, powerHint, powerById } from "../spells.js";
 import { detectSpells } from "../demo.js";
 import { splitSentences } from "../demo.js";
 import { logEvent } from "../log.js";
 import { talkButtonHtml, wireTalk } from "../voice.js";
+import { fuzzyHint } from "../picture.js";
 
 let root, nav;
 
@@ -217,9 +218,13 @@ function writeTurn(draftText = "") {
   wireReading(root, q);
   const ta = wireDesk($(".desk", root));
   q.turnShownAt ||= Date.now();
-  // Spells light up as he types; the power line says what they'll unlock.
+  // Spells light up as he types; the power line says what they'll unlock,
+  // and points at a fuzzy word to make specific.
   const powerLine = $("#story-power", root);
-  const showPower = () => (powerLine.textContent = `🔋 Story power: ${powerHint(detectSpells(ta.value).length)}`);
+  const showPower = () => {
+    const fuzzy = fuzzyHint(ta.value);
+    powerLine.innerHTML = `🔋 Story power: ${esc(powerHint(detectSpells(ta.value).length))}${fuzzy ? `<span class="fuzzy-hint">${esc(fuzzy)}</span>` : ""}`;
+  };
   ta.addEventListener("input", showPower);
   showPower();
   ta.addEventListener("input", () => {
@@ -295,18 +300,24 @@ async function submitTurn(q, text) {
     logEvent("error", { where: "quest_react", code: e.code });
     return turnError(e, text);
   }
-  logEvent("quest.react", { turn: q.turn, cheer: r.cheer, spells: r.spells.map((x) => x.id), bonusDone: r.bonusDone, powerUp: r.powerUp.prompt });
+  const earned = powerFor(r.spells.length);
+  logEvent("quest.react", { turn: q.turn, cheer: r.cheer, spells: r.spells.map((x) => x.id), power: earned.id, fuzzy: r.fuzzy, tip: r.tip, bonusDone: r.bonusDone, powerUp: r.powerUp.prompt });
   if (r.switchedToPractice) toast("Real magic isn't allowed here, so Sparky is using practice magic.");
-  q.story.push({ author: "kid", text, spells: r.spells });
+  q.story.push({ author: "kid", text, spells: r.spells, fuzzy: r.fuzzy, tip: r.tip });
   q.draft = "";
   update((s) => (s.activeQuest = q));
   const result = award({ spells: r.spells, gems: r.bonusDone ? 15 : 0, mode: "quest", text });
-  const earned = powerFor(r.spells.length);
+  // Below Blaze, Sparky says out loud what to make specific.
+  const low = earned.id === "tiny" || earned.id === "spark";
+  if (low) speakTip(r.tip, "quest");
   await showReward({
     cheer: r.cheer + (r.bonusDone ? " BONUS QUEST COMPLETE! +15 💎" : ""),
     spells: r.spells,
     result,
-    power: `${earned.icon} ${earned.label} story power!<small>${earned.id === "tiny" ? "Plain writing makes a plain chapter. Power up your sentence to boost it!" : earned.id === "mega" ? "Your next chapter will be EPIC!" : "Power up your sentence to boost it even more!"}</small>`,
+    power: `${earned.icon} ${earned.label} story power!<small>${
+      low && r.tip ? esc(r.tip) : earned.id === "mega" ? "Your next chapter will be EPIC!" : "Power up your sentence to boost it even more!"
+    }</small>`,
+    button: low ? "⚡ Power it up! →" : "Awesome! →",
   });
   powerUpPanel(q, r.powerUp);
 }
@@ -330,6 +341,7 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
           <div><span class="turn-count">⚡ Power-up · +15 💎 · ${powerFor(kidPart.spells?.length || 0).icon} ${powerFor(kidPart.spells?.length || 0).label} story power now</span>
           <h2>${esc(coach ? coach.cheer : powerUp.prompt)}</h2></div>
         </div>
+        ${coach ? "" : fuzzyHtml(kidPart.fuzzy, kidPart.tip)}
         ${
           coach?.frame
             ? `<div class="frame-help"><span class="label">Fill in the blanks:</span><p class="frame">${esc(coach.frame).replace(/_{3,}/g, '<span class="blank">___</span>')}</p></div>`
@@ -350,6 +362,7 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
     </section>`),
   );
   wireReading(root, q);
+  wireTipButtons(root);
   const ta = wireDesk($(".desk", root));
   $("#turn-panel", root).scrollIntoView({ block: "start", behavior: "smooth" });
   ta.focus({ preventScroll: true });
@@ -358,7 +371,7 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
   wireTalk(root, ".desk", () => ({
     kind: "powerup",
     writerName: get().writerName,
-    where: `Revising ONE sentence from their story to add a detail inside it. The sentence: "${target}".`,
+    where: `Revising ONE sentence from their story to add a detail inside it. The sentence: "${target}".${kidPart.fuzzy?.length ? ` Fuzzy words to make specific: ${kidPart.fuzzy.map((f) => `"${f}"`).join(", ")}.` : ""}`,
     draft: ta.value.trim(),
     question: powerUp.prompt,
   }));

@@ -3,13 +3,14 @@
 
 import { get, update, award, countWords } from "../state.js";
 import { ask, kidMessage, canPaint, paint, detectBackend } from "../ai.js";
-import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward } from "../ui.js";
+import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward, speakTip, fuzzyHtml, wireTipButtons } from "../ui.js";
 import { sfx, confetti } from "../fx.js";
 import { ART_TIERS, artTierFor } from "../prompts.js";
 import { demoCreatureSvg } from "../demo.js";
 import { logEvent } from "../log.js";
 import { starsHtml, wireStars, nextUnlock, countStars, rarityFromStars, PRIZE } from "../details.js";
 import { talkButtonHtml, wireTalk } from "../voice.js";
+import { fuzzyHint } from "../picture.js";
 
 let root, nav;
 let current = null; // the creature being built
@@ -118,7 +119,7 @@ function designer() {
   const ta = wireDesk($(".desk", root));
   const msg = $("#star-msg", root);
   let stars = 0;
-  const say = () => (msg.textContent = starMessage(stars, canPaint()));
+  const say = () => (msg.textContent = [starMessage(stars, canPaint()), fuzzyHint(ta.value)].filter(Boolean).join(" "));
   wireStars($(".star-goal", root), ta, { onCount: (n) => ((stars = n), say()) });
   detectBackend().then(say);
   $("#draw", root).addEventListener("click", () => create(ta.value.trim(), $("#creature-name", root).value.trim()));
@@ -155,6 +156,14 @@ const withSketch = (c) => (c.svg || c.painting ? c : { ...c, svg: demoCreatureSv
 
 const rarityCheer = { rare: "RARE", epic: "EPIC", legendary: "LEGENDARY" };
 
+// A plain description only gets a sketch: say so on the reward, and have
+// Sparky say out loud which star to earn next.
+function sketchLine(c) {
+  if (artTierFor(c) !== "common") return "";
+  speakTip(c.tip, "creature");
+  return `📐 Just a sketch!<small>${esc(c.tip || c.upgradeQuestion)}</small>`;
+}
+
 async function create(description, name) {
   if (countWords(description) < 3) {
     const err = $("#lab-error", root);
@@ -168,7 +177,7 @@ async function create(description, name) {
     await detectBackend();
     const r = await ask("creature_create", { writerName: get().writerName, description, name, sketchOnlyIfCommon: canPaint() });
     let c = { id: "c" + Date.now(), ...r, description, level: 1, createdAt: Date.now() };
-    logEvent("creature.create", { name: r.name, description, words: countWords(description), rarity: r.rarity, spells: r.spells.map((x) => x.id), question: r.upgradeQuestion });
+    logEvent("creature.create", { name: r.name, description, words: countWords(description), rarity: r.rarity, spells: r.spells.map((x) => x.id), question: r.upgradeQuestion, tip: r.tip });
     if (paintable(c)) c = await paintInto(c, `${rarityCheer[c.rarity]}!`);
     c = withSketch(c);
     update((s) => s.creatures.unshift(c));
@@ -177,7 +186,7 @@ async function create(description, name) {
     showCard();
     if (c.painting) sfx.level();
     if (r.rarity === "legendary" || r.rarity === "epic") confetti(80);
-    await showReward({ cheer: `You discovered ${r.name}! ${r.artistNote}`, spells: r.spells, result, mood: "wow" });
+    await showReward({ cheer: `You discovered ${r.name}! ${r.artistNote}`, spells: r.spells, result, mood: "wow", power: sketchLine(c), button: artTierFor(c) === "common" ? "✏️ Add details →" : "Awesome! →" });
   } catch (e) {
     designer();
     $("#creature-desc", root).value = description;
@@ -204,6 +213,7 @@ function showCard() {
           <p class="star-msg" id="star-msg" aria-live="polite"></p>
         </div>
         <p class="evolve-hint">💡 ${esc(c.upgradeQuestion)}</p>
+        ${fuzzyHtml([], c.tip)}
         <label class="sr-only" for="evolve-text">Your description</label>
         ${writingDesk({ id: "evolve-text", placeholder: "My creature is...", rows: 5, goal: 40, value: c.description })}
         <p class="form-error" id="lab-error" role="alert" hidden></p>
@@ -223,9 +233,10 @@ function showCard() {
     original: c.description,
     onCount: (n) => {
       const goesUp = rarityFromStars(n) !== rarityFromStars(earned);
-      msg.textContent = canPaint() && goesUp ? `⭐ ${n} stars! Tap Evolve to unlock ${PRIZE[rarityFromStars(n)]}!` : starMessage(n, canPaint());
+      msg.textContent = [canPaint() && goesUp ? `⭐ ${n} stars! Tap Evolve to unlock ${PRIZE[rarityFromStars(n)]}!` : starMessage(n, canPaint()), fuzzyHint(ta.value)].filter(Boolean).join(" ");
     },
   });
+  wireTipButtons(root);
   $("#new", root).addEventListener("click", () => {
     current = null;
     designer();
@@ -351,7 +362,7 @@ async function evolve(description) {
     showCard();
     if (next.painting && next.paintedLevel === next.level) sfx.level();
     confetti(50);
-    await showReward({ cheer: `${c.name} EVOLVED to level ${next.level}! ${r.artistNote}`, spells: r.spells, result, mood: "wow" });
+    await showReward({ cheer: `${c.name} EVOLVED to level ${next.level}! ${r.artistNote}`, spells: r.spells, result, mood: "wow", power: sketchLine(next), button: artTierFor(next) === "common" ? "✏️ Add details →" : "Awesome! →" });
   } catch (e) {
     showCard();
     const ta = $("#evolve-text", root);

@@ -2,7 +2,8 @@
 
 import { spellById } from "./spells.js";
 import { get, stageFor } from "./state.js";
-import { sparkySvg, sfx, confetti } from "./fx.js";
+import { sparkySvg, sfx, confetti, speak } from "./fx.js";
+import { logEvent } from "./log.js";
 import { detectSpells } from "./demo.js";
 import { SPELLS } from "./spells.js";
 
@@ -82,7 +83,7 @@ export function wireDesk(root) {
 }
 
 // The big reward moment after the writer submits something.
-export function showReward({ cheer, spells = [], result, title = "Spells cast!", mood = "chomp", power = "" }) {
+export function showReward({ cheer, spells = [], result, title = "Spells cast!", mood = "chomp", power = "", button = "Awesome! →" }) {
   return new Promise((resolve) => {
     const { gained, newSpells, levelUp } = result;
     const overlay = el(`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -94,7 +95,7 @@ export function showReward({ cheer, spells = [], result, title = "Spells cast!",
         ${power ? `<div class="power-line pop" style="animation-delay:${0.2 + spells.length * 0.25}s">${power}</div>` : ""}
         ${gained ? `<div class="gem-gain pop" style="animation-delay:${0.3 + spells.length * 0.25}s">+${gained} 💎</div>` : ""}
         ${levelUp ? `<div class="level-up pop" style="animation-delay:${0.6 + spells.length * 0.25}s">🎉 Sparky grew! Now a <b>${esc(levelUp.name)}</b>!</div>` : ""}
-        <button class="btn btn-go" type="button">Awesome! →</button>
+        <button class="btn btn-go" type="button">${esc(button)}</button>
       </div>
     </div>`);
     document.body.appendChild(overlay);
@@ -109,6 +110,29 @@ export function showReward({ cheer, spells = [], result, title = "Spells cast!",
       resolve();
     });
   });
+}
+
+// When the writing isn't hitting the mark, Sparky says his tip out loud
+// (OpenAI voice, or the browser's voice without a key). Grown-ups can turn
+// this off.
+export function speakTip(tip, where) {
+  if (!tip || get().settings.voiceTips === false) return;
+  logEvent("voice.tip", { where, tip });
+  speak(tip, { style: "coach" });
+}
+
+// The writer's fuzzy words, quoted back ("rord rely loud"), plus a button
+// that replays Sparky's tip.
+export function fuzzyHtml(fuzzy = [], tip = "") {
+  if (!fuzzy.length && !tip) return "";
+  return `<div class="fuzzy-row">
+    ${fuzzy.length ? `<span class="fuzzy-label">🔍 Fuzzy:</span>${fuzzy.map((f) => `<q class="fuzzy-quote">${esc(f)}</q>`).join("")}` : ""}
+    ${tip ? `<button class="tip-play" type="button" data-tip="${esc(tip)}">🔊 Sparky's tip</button>` : ""}
+  </div>`;
+}
+
+export function wireTipButtons(scope) {
+  scope.querySelectorAll(".tip-play").forEach((b) => b.addEventListener("click", () => speak(b.dataset.tip, { style: "coach" })));
 }
 
 export function toast(text) {

@@ -120,13 +120,13 @@ function browserSpeak(text, { style, onend }) {
   const u = new SpeechSynthesisUtterance(text);
   voice = voice || pickVoice();
   if (voice) u.voice = voice;
-  u.pitch = style === "trailer" ? 0.55 : 1;
+  u.pitch = style === "trailer" ? 0.55 : style === "coach" ? 1.15 : 1;
   u.rate = style === "trailer" ? 0.85 : 0.95;
   u.onend = () => onend?.();
   speechSynthesis.speak(u);
 }
 
-// speak(text, { style: "story" | "trailer", onstart, onend, onfallback })
+// speak(text, { style: "story" | "coach" | "trailer", onstart, onend, onfallback })
 // onfallback(code, message) runs if OpenAI's voice failed and the browser
 // voice is used instead.
 export async function speak(text, { style = "story", onstart, onend, onfallback } = {}) {
