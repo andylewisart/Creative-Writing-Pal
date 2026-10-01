@@ -1,6 +1,6 @@
 // Builds the static github.io version into site/.
-// There's no server there, so a grown-up saves API keys in the browser
-// (Grown-ups corner) and the page calls Anthropic and OpenAI directly.
+// There's no server there, so a grown-up saves the OpenAI key in the browser
+// (Grown-ups corner) and the page calls OpenAI directly.
 
 import fs from "node:fs";
 import path from "node:path";

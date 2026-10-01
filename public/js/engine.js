@@ -1,11 +1,12 @@
-// The actual AI calls, shared by server.js (keys on the server) and the
-// github.io build (keys saved in the browser). Callers pass in the SDK
-// clients and classes, so this file has no imports a browser can't load.
+// The actual AI calls (all OpenAI), shared by server.js (key on the server)
+// and the github.io build (key saved in the browser). Callers pass in the
+// SDK client and class, so this file has no imports a browser can't load.
 
 import { GUIDE, TASKS, paintPrompt, voiceInstructions } from "./prompts.js";
 
 export const DEFAULTS = {
-  model: "claude-opus-5-5",
+  model: "gpt-6.1-sol",
+  effort: "low", // ChatGPT's "Light" thinking level
   imageModel: "gpt-image-2.5-flare",
   imageQuality: "medium",
   imageSize: "1024x1024",
@@ -21,51 +22,45 @@ export class TaskError extends Error {
   }
 }
 
-// Run one game task on Claude and return the parsed JSON reply.
-// `state.useFallbacks` is flipped off (and kept off) if the account rejects them.
-export async function runClaudeTask({ client, Anthropic, model = DEFAULTS.model, state = { useFallbacks: true } }, task, payload) {
+function errorCode(e, OpenAI) {
+  if (e instanceof OpenAI.BadRequestError && /moderation|safety/i.test(String(e.code))) return "refused";
+  if (e instanceof OpenAI.RateLimitError) return "rate_limited";
+  if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) return "not_granted";
+  if (e instanceof OpenAI.APIConnectionError) return "network";
+  return "default";
+}
+
+const wrap = (e, OpenAI) => (e instanceof TaskError ? e : new TaskError(errorCode(e, OpenAI), e.message, e.status));
+
+// Run one game task and return the parsed JSON reply. The API enforces the
+// task's schema (strict structured output), so replies always fit the game.
+export async function runTextTask({ openai, OpenAI, model = DEFAULTS.model, effort = DEFAULTS.effort }, task, payload) {
   const t = TASKS[task];
-  const params = {
-    model,
-    max_tokens: 16000,
-    system: [{ type: "text", text: GUIDE, cache_control: { type: "ephemeral" } }],
-    output_config: { effort: t.effort, format: { type: "json_schema", schema: t.schema } },
-    messages: [{ role: "user", content: t.build(payload) }],
-  };
   let response;
   try {
-    if (state.useFallbacks) {
-      try {
-        // If a safety classifier declines, the API re-runs the request on a fallback model.
-        response = await client.beta.messages.create({
-          ...params,
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
-        });
-      } catch (e) {
-        if (!(e instanceof Anthropic.BadRequestError)) throw e;
-        console.warn("Fallbacks not accepted for this account; continuing without them:", e.message);
-        state.useFallbacks = false;
-      }
-    }
-    if (!response) response = await client.messages.create(params);
+    response = await openai.responses.create({
+      model,
+      instructions: GUIDE,
+      input: t.build(payload),
+      reasoning: { effort },
+      max_output_tokens: 16000,
+      store: false, // don't keep a child's writing on OpenAI's side
+      text: { format: { type: "json_schema", name: task, schema: t.schema, strict: true } },
+    });
   } catch (e) {
-    throw new TaskError(claudeErrorCode(e, Anthropic), e.message, e.status);
+    throw wrap(e, OpenAI);
   }
-  if (response.stop_reason === "refusal") throw new TaskError("refused", "Claude declined this request", 422);
-  const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+  const content = (response.output || []).filter((o) => o.type === "message").flatMap((o) => o.content || []);
+  if (content.some((c) => c.type === "refusal")) throw new TaskError("refused", "The model declined this request", 422);
+  if (response.status === "incomplete") {
+    throw new TaskError("default", `Reply was cut short (${response.incomplete_details?.reason || "incomplete"})`, 502);
+  }
+  const text = content.filter((c) => c.type === "output_text").map((c) => c.text).join("");
   try {
     return JSON.parse(text);
   } catch {
-    throw new TaskError("default", `Reply was not valid JSON (stop_reason: ${response.stop_reason})`, 502);
+    throw new TaskError("default", "Reply was not valid JSON", 502);
   }
-}
-
-function claudeErrorCode(e, Anthropic) {
-  if (e instanceof Anthropic.RateLimitError) return "rate_limited";
-  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return "not_granted";
-  if (e instanceof Anthropic.APIConnectionError) return "network";
-  return "default";
 }
 
 // Paint a creature card. Returns base64 JPEG data.
@@ -85,13 +80,7 @@ export async function paintCreature({ openai, OpenAI, model = DEFAULTS.imageMode
     if (!b64) throw new TaskError("default", "No image in reply", 502);
     return b64;
   } catch (e) {
-    if (e instanceof TaskError) throw e;
-    let code = "default";
-    if (e instanceof OpenAI.BadRequestError && /moderation|safety/i.test(String(e.code))) code = "refused";
-    else if (e instanceof OpenAI.RateLimitError) code = "rate_limited";
-    else if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) code = "not_granted";
-    else if (e instanceof OpenAI.APIConnectionError) code = "network";
-    throw new TaskError(code, e.message, e.status);
+    throw wrap(e, OpenAI);
   }
 }
 
@@ -119,10 +108,6 @@ export async function createVoiceSession({ openai, OpenAI, model = DEFAULTS.voic
     });
     return { value: secret.value, model };
   } catch (e) {
-    let code = "default";
-    if (e instanceof OpenAI.RateLimitError) code = "rate_limited";
-    else if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) code = "not_granted";
-    else if (e instanceof OpenAI.APIConnectionError) code = "network";
-    throw new TaskError(code, e.message, e.status);
+    throw wrap(e, OpenAI);
   }
 }

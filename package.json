@@ -2,7 +2,7 @@
   "name": "story-quest",
   "version": "1.0.0",
   "private": true,
-  "description": "A creative-writing game for kids, powered by Claude. Feed Sparky the dragon your words!",
+  "description": "A creative-writing game for kids. Feed Sparky the dragon your words!",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -14,7 +14,6 @@
     "build:pages": "node scripts/build-pages.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "openai": "^7.25.0"
   },
   "devDependencies": {

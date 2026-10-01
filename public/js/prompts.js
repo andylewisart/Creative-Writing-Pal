@@ -11,6 +11,7 @@ export const GUIDE = `You are the Story Guide inside "Story Quest", a creative-w
 How to talk:
 - Short sentences, vivid words, around a 2nd-3rd grade reading level. Playful and excited, never babyish, never preachy.
 - Sparky's lines are 1-3 sentences. Sparky can be silly (dragon burps, snacking on words), and uses the writer's name now and then.
+- Story chapters are pure storytelling. Sparky is the writer's coach, not a character: he never appears in a chapter, and a chapter never talks to the writer or mentions their name. Sparky's voice belongs only in fields like cheer.
 
 Teaching rules (follow every one):
 1. Fun comes first. Celebrate effort and imagination.
@@ -91,7 +92,6 @@ function heroLine(q) {
 export const TASKS = {
   quest_start: {
     tier: "default",
-    effort: "low",
     build: (p) => `TASK: Begin a new co-written adventure story.
 
 Writer's name: ${p.writerName}
@@ -109,7 +109,6 @@ Write Chapter 1 (90-140 words). Introduce the hero in the world with vivid detai
 
   quest_react: {
     tier: "default",
-    effort: "low",
     build: (p) => `TASK: React to the writer's newest part of the story.
 
 Writer's name: ${p.writerName}
@@ -144,7 +143,6 @@ Return:
 
   quest_revise: {
     tier: "default",
-    effort: "low",
     build: (p) => `TASK: The writer is revising one sentence to power it up. Check how it went.
 
 Writer's name: ${p.writerName}
@@ -176,7 +174,6 @@ Decide:
 
   quest_continue: {
     tier: "default",
-    effort: "low",
     build: (p) => {
       const turnsLeft = p.totalTurns - p.turnNumber;
       const pacing =
@@ -211,7 +208,6 @@ Use at least three spells in your own writing. Pick three emojis that show the n
 
   quest_finish: {
     tier: "default",
-    effort: "low",
     build: (p) => `TASK: The co-written story is finished. Celebrate it.
 
 Writer's name: ${p.writerName}
@@ -237,7 +233,6 @@ Return:
 
   spark: {
     tier: "quick",
-    effort: "low",
     build: (p) => `TASK: The writer is stuck and tapped the crystal ball for ideas.
 
 Writer's name: ${p.writerName}
@@ -252,7 +247,6 @@ Give exactly three short idea sparks (each under 15 words). Each spark is a curi
 
   epic_judge: {
     tier: "quick",
-    effort: "low",
     build: (p) => `TASK: Mini-game "Boring-to-EPIC". The writer was given a boring sentence and rewrote it to be as epic as possible.
 
 Writer's name: ${p.writerName}
@@ -281,7 +275,6 @@ Return:
 
   creature_create: {
     tier: "default",
-    effort: "medium",
     build: (p) => `TASK: Creature Lab. The writer described a creature. Turn it into a collectible creature card and draw it.
 
 Writer's name: ${p.writerName}
@@ -367,7 +360,7 @@ Start now: greet them in one short sentence and ask your first question about wh
 }
 
 // Painted art gets cooler as the writing gets more detailed. The card's
-// rarity (judged by Claude from the description) picks the art style.
+// rarity (judged by the AI from the description) picks the art style.
 export const ART_TIERS = {
   common: {
     label: "Pencil sketch",
@@ -421,7 +414,7 @@ It can look fierce, powerful, and intimidating (roaring, glowing eyes, battle-re
 }
 
 // Turn a JSON schema into a compact shape description, for backends that
-// can't enforce a schema (the artifact's Claude connection).
+// can't enforce a schema (the claude.ai artifact version).
 export function describeShape(schema, indent = "") {
   if (schema.enum) return schema.enum.map((v) => JSON.stringify(v)).join(" | ");
   if (schema.type === "string") return "string";

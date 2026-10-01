@@ -1,4 +1,4 @@
-// Runs server.js against a fake Claude API to check the request we send
+// Runs server.js against a fake OpenAI API to check the requests we send
 // and how replies and errors come back to the game.
 
 import { test } from "node:test";
@@ -7,7 +7,7 @@ import http from "node:http";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
-function fakeClaude(handler) {
+function fakeOpenAI(handler) {
   const seen = [];
   const server = http.createServer(async (req, res) => {
     let body = "";
@@ -21,90 +21,35 @@ function fakeClaude(handler) {
   return new Promise((r) => server.listen(0, "127.0.0.1", () => r({ server, seen, port: server.address().port })));
 }
 
-const message = (text, stop = "end_turn") => ({
-  id: "msg_1",
-  type: "message",
-  role: "assistant",
-  model: "claude-opus-5-5",
-  content: [{ type: "text", text }],
-  stop_reason: stop,
-  usage: { input_tokens: 10, output_tokens: 10 },
+// A Responses API reply carrying one output_text (or a refusal).
+const response = (text, { status = "completed", refusal = false } = {}) => ({
+  id: "resp_1",
+  object: "response",
+  model: "gpt-6.1-sol",
+  status,
+  incomplete_details: status === "incomplete" ? { reason: "max_output_tokens" } : null,
+  output: [
+    { type: "reasoning", id: "rs_1", summary: [] },
+    {
+      type: "message",
+      id: "msg_1",
+      role: "assistant",
+      status: "completed",
+      content: [refusal ? { type: "refusal", refusal: "I can't help with that." } : { type: "output_text", text, annotations: [] }],
+    },
+  ],
+  usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
 });
-
-async function startGame(apiPort, gamePort) {
-  const child = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, ANTHROPIC_API_KEY: "test-key", ANTHROPIC_BASE_URL: `http://127.0.0.1:${apiPort}`, PORT: String(gamePort), HOST: "127.0.0.1" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let out = "";
-  child.stdout.on("data", (d) => (out += d));
-  child.stderr.on("data", (d) => (out += d));
-  while (!out.includes("running at")) await once(child.stdout, "data");
-  return { child, log: () => out };
-}
 
 const post = (port, body) =>
   fetch(`http://127.0.0.1:${port}/api/ai`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
 const spark = { task: "spark", payload: { writerName: "Leo", context: "a dragon story", draft: "" } };
 
-test("server sends a structured-output request with fallbacks and returns parsed JSON", async () => {
-  const api = await fakeClaude(() => [200, message(JSON.stringify({ sparks: ["What if?", "How?", "Why?"] }))]);
-  const game = await startGame(api.port, 3911);
-  try {
-    const status = await (await fetch("http://127.0.0.1:3911/api/status")).json();
-    assert.equal(status.live, true);
-
-    const res = await post(3911, spark);
-    assert.equal(res.status, 200);
-    assert.deepEqual((await res.json()).sparks, ["What if?", "How?", "Why?"]);
-
-    const req = api.seen[0];
-    assert.match(req.url, /\/v1\/messages/);
-    assert.equal(req.body.model, "claude-opus-5-5");
-    assert.equal(req.body.fallbacks, "default");
-    assert.match(req.headers["anthropic-beta"], /server-side-fallback-2026-07-01/);
-    assert.equal(req.body.output_config.format.type, "json_schema");
-    assert.equal(req.body.output_config.effort, "low");
-    assert.ok(req.body.system[0].text.includes("Sparky"));
-    assert.equal(req.body.thinking, undefined);
-
-    const bad = await post(3911, { task: "constructor", payload: {} });
-    assert.equal(bad.status, 400);
-  } finally {
-    game.child.kill();
-    api.server.close();
-  }
-});
-
-test("server retries without fallbacks if the account rejects them, and maps refusals", async () => {
-  const api = await fakeClaude((req, n) => {
-    if (req.body.fallbacks) return [400, { type: "error", error: { type: "invalid_request_error", message: "fallbacks not enabled" } }];
-    if (n === 2) return [200, message(JSON.stringify({ sparks: ["a", "b", "c"] }))];
-    return [200, message("", "refusal")];
-  });
-  const game = await startGame(api.port, 3912);
-  try {
-    const ok = await post(3912, spark);
-    assert.equal(ok.status, 200);
-    assert.equal(api.seen.length, 2);
-    assert.equal(api.seen[1].body.fallbacks, undefined);
-
-    const refused = await post(3912, spark);
-    assert.equal(refused.status, 422);
-    assert.equal((await refused.json()).code, "refused");
-    assert.equal(api.seen.length, 3, "no fallback attempt after it was rejected once");
-  } finally {
-    game.child.kill();
-    api.server.close();
-  }
-});
-
-async function startPainter(fakePort, gamePort, extraEnv = {}) {
+async function startServer(fakePort, gamePort, extraEnv = {}) {
   const child = spawn(process.execPath, ["server.js"], {
     env: {
       ...process.env,
-      ANTHROPIC_API_KEY: "",
       OPENAI_API_KEY: "test-key",
       OPENAI_BASE_URL: `http://127.0.0.1:${fakePort}/v1`,
       PORT: String(gamePort),
@@ -123,13 +68,66 @@ async function startPainter(fakePort, gamePort, extraEnv = {}) {
 const paintReq = (port, creature) =>
   fetch(`http://127.0.0.1:${port}/api/paint`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creature }) });
 
+test("story tasks go to gpt-6.1-sol with Light (low) thinking and a strict schema", async () => {
+  const api = await fakeOpenAI(() => [200, response(JSON.stringify({ sparks: ["What if?", "How?", "Why?"] }))]);
+  const game = await startServer(api.port, 3911);
+  try {
+    const status = await (await fetch("http://127.0.0.1:3911/api/status")).json();
+    assert.deepEqual([status.live, status.paint, status.voice, status.model], [true, true, true, "gpt-6.1-sol"]);
+
+    const res = await post(3911, spark);
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).sparks, ["What if?", "How?", "Why?"]);
+
+    const req = api.seen[0];
+    assert.match(req.url, /\/v1\/responses$/);
+    assert.equal(req.headers.authorization, "Bearer test-key");
+    assert.equal(req.body.model, "gpt-6.1-sol");
+    assert.deepEqual(req.body.reasoning, { effort: "low" });
+    assert.equal(req.body.store, false);
+    assert.equal(req.body.text.format.type, "json_schema");
+    assert.equal(req.body.text.format.strict, true);
+    assert.equal(req.body.text.format.name, "spark");
+    assert.ok(req.body.instructions.includes("Sparky"));
+    assert.match(req.body.input, /TASK:/);
+
+    const bad = await post(3911, { task: "constructor", payload: {} });
+    assert.equal(bad.status, 400);
+  } finally {
+    game.kill();
+    api.server.close();
+  }
+});
+
+test("refusals, cut-off replies, and bad keys come back as friendly codes", async () => {
+  const replies = [
+    [200, response("", { refusal: true })],
+    [200, response('{"sparks": ["What', { status: "incomplete" })],
+    [401, { error: { message: "Incorrect API key provided", type: "invalid_request_error", code: "invalid_api_key" } }],
+  ];
+  const api = await fakeOpenAI((_, n) => replies[n - 1]);
+  const game = await startServer(api.port, 3912);
+  try {
+    const refused = await post(3912, spark);
+    assert.equal(refused.status, 422);
+    assert.equal((await refused.json()).code, "refused");
+    const cut = await post(3912, spark);
+    assert.equal(cut.status, 502);
+    const key = await post(3912, spark);
+    assert.equal(key.status, 401);
+    assert.equal((await key.json()).code, "not_granted");
+  } finally {
+    game.kill();
+    api.server.close();
+  }
+});
+
 test("paint endpoint asks the image model for one opaque jpeg and enforces the daily cap", async () => {
-  const api = await fakeClaude(() => [200, { created: 1, data: [{ b64_json: "AAAA" }] }]);
-  const game = await startPainter(api.port, 3913, { PAINTS_PER_DAY: "2" });
+  const api = await fakeOpenAI(() => [200, { created: 1, data: [{ b64_json: "AAAA" }] }]);
+  const game = await startServer(api.port, 3913, { PAINTS_PER_DAY: "2" });
   try {
     const status = await (await fetch("http://127.0.0.1:3913/api/status")).json();
     assert.equal(status.paint, true);
-    assert.equal(status.live, false);
 
     const res = await paintReq(3913, { name: "Zapzilla", description: "A giant purple monster with wings.", habitat: "a volcano" });
     assert.equal(res.status, 200);
@@ -153,8 +151,8 @@ test("paint endpoint asks the image model for one opaque jpeg and enforces the d
 });
 
 test("paint endpoint maps a moderation block to a friendly refusal and doesn't count it", async () => {
-  const api = await fakeClaude(() => [400, { error: { message: "Your request was rejected by the safety system.", type: "image_generation_user_error", code: "moderation_blocked" } }]);
-  const game = await startPainter(api.port, 3914, { PAINTS_PER_DAY: "1" });
+  const api = await fakeOpenAI(() => [400, { error: { message: "Your request was rejected by the safety system.", type: "image_generation_user_error", code: "moderation_blocked" } }]);
+  const game = await startServer(api.port, 3914, { PAINTS_PER_DAY: "1" });
   try {
     for (let i = 0; i < 2; i++) {
       const res = await paintReq(3914, { description: "something" });
@@ -168,8 +166,8 @@ test("paint endpoint maps a moderation block to a friendly refusal and doesn't c
 });
 
 test("voice endpoint mints a short-lived realtime key with the coaching instructions", async () => {
-  const api = await fakeClaude(() => [200, { value: "ek_test", expires_at: 1 }]);
-  const game = await startPainter(api.port, 3915, { VOICE_SESSIONS_PER_DAY: "1" });
+  const api = await fakeOpenAI(() => [200, { value: "ek_test", expires_at: 1 }]);
+  const game = await startServer(api.port, 3915, { VOICE_SESSIONS_PER_DAY: "1" });
   try {
     const status = await (await fetch("http://127.0.0.1:3915/api/status")).json();
     assert.equal(status.voice, true);

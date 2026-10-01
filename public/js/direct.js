@@ -1,35 +1,22 @@
-// github.io build: call Claude and the image model straight from the browser,
-// using the keys a grown-up saved on this device. Only loaded in that build.
+// github.io build: call OpenAI straight from the browser, using the key a
+// grown-up saved on this device. Only loaded in that build.
 
-import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { runClaudeTask, paintCreature, createVoiceSession, TaskError } from "./engine.js";
+import { runTextTask, paintCreature, createVoiceSession, TaskError } from "./engine.js";
 import { getKeys } from "./keys.js";
 
 const PAINTS_PER_DAY = 25;
 const PAINT_COUNT_KEY = "storyquest.paints.v1";
 
-let cache = { stamp: null };
-function clients() {
-  const keys = getKeys();
-  const stamp = `${keys.anthropic || ""}|${keys.openai || ""}`;
-  if (stamp !== cache.stamp) {
-    cache = {
-      stamp,
-      claude: keys.anthropic
-        ? { client: new Anthropic({ apiKey: keys.anthropic, dangerouslyAllowBrowser: true }), Anthropic, state: { useFallbacks: true } }
-        : null,
-      painter: keys.openai ? { openai: new OpenAI({ apiKey: keys.openai, dangerouslyAllowBrowser: true }), OpenAI } : null,
-    };
-  }
-  return cache;
+let cache = { key: null, openai: null };
+function client() {
+  const key = getKeys().openai || null;
+  if (key !== cache.key) cache = { key, openai: key ? new OpenAI({ apiKey: key, dangerouslyAllowBrowser: true }) : null };
+  if (!cache.openai) throw new TaskError("bad_key", "No OpenAI key saved");
+  return { openai: cache.openai, OpenAI };
 }
 
-export async function directAsk(task, payload) {
-  const { claude } = clients();
-  if (!claude) throw new TaskError("bad_key", "No Anthropic key saved");
-  return runClaudeTask(claude, task, payload);
-}
+export const directAsk = (task, payload) => runTextTask(client(), task, payload);
 
 // Same daily cap as the server, counted in this browser.
 function paintsToday(add = 0) {
@@ -47,38 +34,32 @@ function paintsToday(add = 0) {
 }
 
 export async function directPaint(creature) {
-  const { painter } = clients();
-  if (!painter) throw new TaskError("bad_key", "No OpenAI key saved");
+  const c = client();
   if (paintsToday() >= PAINTS_PER_DAY) throw new TaskError("paint_limit", "Daily painting limit reached");
   paintsToday(+1);
   try {
-    return `data:image/jpeg;base64,${await paintCreature(painter, creature)}`;
+    return `data:image/jpeg;base64,${await paintCreature(c, creature)}`;
   } catch (e) {
     paintsToday(-1);
     throw e;
   }
 }
 
-export async function directVoiceSession(ctx) {
-  const { painter } = clients();
-  if (!painter) throw new TaskError("bad_key", "No OpenAI key saved");
-  return createVoiceSession({ openai: painter.openai, OpenAI }, ctx);
-}
+export const directVoiceSession = (ctx) => createVoiceSession(client(), ctx);
 
-// Free checks (listing models costs nothing) so a grown-up knows the keys work.
-export async function checkKeys() {
-  const { claude, painter } = clients();
-  const check = async (fn, Klass) => {
-    try {
-      await fn();
-      return "ok";
-    } catch (e) {
-      if (e instanceof Klass.AuthenticationError || e instanceof Klass.PermissionDeniedError) return "bad";
-      return "unreachable";
-    }
-  };
-  return {
-    anthropic: claude ? await check(() => claude.client.models.list({ limit: 1 }), Anthropic) : "none",
-    openai: painter ? await check(() => painter.openai.models.list(), OpenAI) : "none",
-  };
+// A free check (listing models costs nothing) so a grown-up knows the key works.
+export async function checkKey() {
+  let c;
+  try {
+    c = client();
+  } catch {
+    return "none";
+  }
+  try {
+    await c.openai.models.list();
+    return "ok";
+  } catch (e) {
+    if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) return "bad";
+    return "unreachable";
+  }
 }

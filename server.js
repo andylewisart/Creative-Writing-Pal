@@ -1,16 +1,15 @@
-// Story Quest server: serves the game and talks to Claude with your API key.
-//   ANTHROPIC_API_KEY=sk-ant-... npm start   ->  http://localhost:3000
-// Without a key the game still runs in "practice magic" mode.
-// Optional: OPENAI_API_KEY turns on painted creature art in Creature Lab.
+// Story Quest server: serves the game and talks to OpenAI with your API key.
+//   OPENAI_API_KEY=sk-proj-... npm start   ->  http://localhost:3000
+// One key runs everything: stories and coaching, painted creature art, and
+// the voice coach. Without a key the game runs in "practice magic" mode.
 
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { TASKS } from "./public/js/prompts.js";
-import { DEFAULTS, runClaudeTask, paintCreature, createVoiceSession } from "./public/js/engine.js";
+import { DEFAULTS, runTextTask, paintCreature, createVoiceSession } from "./public/js/engine.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -20,10 +19,11 @@ loadDotEnv(path.join(here, ".env"));
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 const MODEL = process.env.STORY_QUEST_MODEL || DEFAULTS.model;
-const live = Boolean(process.env.ANTHROPIC_API_KEY);
-const claude = { client: live ? new Anthropic() : null, Anthropic, model: MODEL, state: { useFallbacks: true } };
-
+const EFFORT = process.env.STORY_QUEST_EFFORT || DEFAULTS.effort;
 const openai = process.env.OPENAI_API_KEY ? new OpenAI() : null;
+const live = Boolean(openai);
+const writer = { openai, OpenAI, model: MODEL, effort: EFFORT };
+
 const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || DEFAULTS.imageModel;
 const IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || DEFAULTS.imageQuality;
 const painter = {
@@ -84,11 +84,11 @@ async function handleAI(req, res) {
   if (!Object.hasOwn(TASKS, task) || typeof payload !== "object" || !payload) {
     return send(res, 400, { error: "Unknown task" });
   }
-  if (!live) return send(res, 503, { error: "No ANTHROPIC_API_KEY set", code: "not_granted" });
+  if (!live) return send(res, 503, { error: "No OPENAI_API_KEY set", code: "not_granted" });
 
   const started = Date.now();
   try {
-    const result = await runClaudeTask(claude, task, payload);
+    const result = await runTextTask(writer, task, payload);
     console.log(`${task} ok in ${Date.now() - started}ms`);
     send(res, 200, result);
   } catch (e) {
@@ -187,7 +187,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`\n  🐉 Story Quest is running at http://localhost:${PORT}`);
-  console.log(live ? `  ✨ Real magic: using ${MODEL}` : "  🪄 Practice magic: set ANTHROPIC_API_KEY to turn on real AI");
-  console.log(openai ? `  🎨 Creature paintings: using ${IMAGE_MODEL} (${IMAGE_QUALITY}, max ${PAINTS_PER_DAY}/day)` : "  🎨 Creature paintings off: set OPENAI_API_KEY to turn them on");
+  console.log(live ? `  ✨ Real magic: ${MODEL} (${EFFORT} thinking), ${IMAGE_MODEL} paintings, voice coach on` : "  🪄 Practice magic: set OPENAI_API_KEY to turn on real AI");
   console.log("  (Other devices on your Wi-Fi can use this computer's IP address and the same port.)\n");
 });

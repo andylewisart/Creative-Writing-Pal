@@ -1,7 +1,7 @@
 // One door to the AI, three possible backends:
 //  1. "claude"  - running as a claude.ai artifact: asks Claude on the viewer's account.
-//  2. "server"  - running from server.js with an API key: POST /api/ai.
-//  3. "direct"  - github.io build with keys saved on this device: calls the APIs from the browser.
+//  2. "server"  - running from server.js with an OpenAI key: POST /api/ai.
+//  3. "direct"  - github.io build with an OpenAI key saved on this device: calls OpenAI from the browser.
 //  4. "practice" - nothing connected: simple word-pattern magic (demo.js).
 
 import { NORMALIZE, TASKS, fullPrompt } from "./prompts.js";
@@ -29,7 +29,7 @@ export function detectBackend() {
       const keys = getKeys();
       paintOn = Boolean(keys.openai);
       voiceOn = Boolean(keys.openai);
-      return (backend = { kind: keys.anthropic ? "direct" : "practice" });
+      return (backend = { kind: keys.openai ? "direct" : "practice" });
     }
     try {
       const res = await fetch("api/status", { headers: { accept: "application/json" } });

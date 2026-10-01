@@ -1,5 +1,5 @@
-// API keys a grown-up saved on this device (github.io build only).
-// They live in this browser's storage and are sent only to Anthropic and OpenAI.
+// The OpenAI key a grown-up saved on this device (github.io build only).
+// It lives in this browser's storage and is sent only to OpenAI.
 
 const KEY = "storyquest.keys.v1";
 

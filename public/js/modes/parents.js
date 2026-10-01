@@ -105,7 +105,7 @@ async function dashboard() {
       <div class="p-how">
         <p><b>Detail earns power.</b> Every mode rewards the same eight craft moves ("spells"): sensory detail, sound words, dialogue, feelings, comparisons, strong verbs, and twists. Gems, Sparky's growth, and creature stats all come from using them.</p>
         <p><b>Revision is a power-up, not a correction.</b> After each story turn, Sparky picks one sentence your child wrote and asks one curious question about it. They edit that sentence in place, guided by a quick before-and-after example. If they tack the detail on the end ("…from the ground. Red fire."), Sparky celebrates the detail and offers a fill-in-the-blank frame built from their own sentence, so they learn where details go.</p>
-        <p><b>Talk first, then write.</b> With an OpenAI key, the 🎙️ voice coach lets your child talk an idea through with Sparky out loud. Kids can usually say much more than they can write. Their spoken ideas appear as notes to write from, and Sparky never dictates the writing.</p>
+        <p><b>Talk first, then write.</b> The 🎙️ voice coach lets your child talk an idea through with Sparky out loud. Kids can usually say much more than they can write. Their spoken ideas appear as notes to write from, and Sparky never dictates the writing.</p>
         <p><b>No red pen.</b> The AI never mentions spelling or grammar and never writes your child's part for them. Praise always quotes their actual words. The "Idea crystal" gives questions, not sentences to copy.</p>
         <p><b>Ways to help:</b> read the finished books together and ask about the favorite line. Try Creature Lab side by side: one of you writes a short description, the other a detailed one, and compare the drawings.</p>
       </div>
@@ -149,30 +149,27 @@ async function dashboard() {
   const status = $("#ai-status", root);
   if (!status) return;
   status.textContent = {
-    direct: "Connected with the API keys saved on this device. Stories and judging use your Anthropic key; painted creature art uses your OpenAI key.",
-    claude: "Connected through your Claude account. Each AI step uses your Claude usage. The first time, Claude asks you to allow this page to use it.",
-    server: "Connected through the Story Quest server and your Anthropic API key.",
+    direct: "Connected with the OpenAI key saved on this device. It runs the stories, Sparky's coaching, the painted creature art, and the voice coach.",
+    claude: "Connected through your Claude account (this is the claude.ai version). Each AI step uses your Claude usage. Painting and the voice coach aren't available here; use the github.io version for those.",
+    server: "Connected through the Story Quest server and its OpenAI key.",
     practice: IS_STATIC_SITE
-      ? "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. Add an Anthropic API key below to turn on real AI on this device."
-      : "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. To turn on real AI, open the game as a Claude artifact, or run the server with an Anthropic API key (see the README).",
+      ? "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. Add an OpenAI API key below to turn on real AI on this device."
+      : "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. To turn on real AI, run the server with an OpenAI API key (see the README).",
   }[backendKind()];
 }
 
 function connectHtml() {
   const k = getKeys();
-  const state = (v) => (v ? `<span class="key-state ok">saved ${esc(maskKey(v))}</span>` : `<span class="key-state">not set</span>`);
   return `<div class="connect">
-    <p class="p-note">Keys are saved only in this browser on this device, and are sent only to Anthropic and OpenAI. Anyone using this device could dig them out of the browser's developer tools, so set a monthly spending limit on both accounts.</p>
+    <p class="p-note">The key is saved only in this browser on this device, and is sent only to OpenAI. Anyone using this device could dig it out of the browser's developer tools, so set a monthly spending limit on your OpenAI account.</p>
     <div class="p-settings">
-      <label for="key-anthropic">Anthropic API key ${state(k.anthropic)}<small>Stories, Sparky, and judging. Get one at console.anthropic.com</small></label>
-      <input id="key-anthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
-      <label for="key-openai">OpenAI API key ${state(k.openai)}<small>Optional: painted creature art. Get one at platform.openai.com</small></label>
+      <label for="key-openai">OpenAI API key ${k.openai ? `<span class="key-state ok">saved ${esc(maskKey(k.openai))}</span>` : `<span class="key-state">not set</span>`}<small>Runs everything: stories, coaching, paintings, voice. Get one at platform.openai.com</small></label>
       <input id="key-openai" type="password" autocomplete="off" spellcheck="false" placeholder="sk-proj-...">
     </div>
     <div class="danger-zone">
-      <button class="btn btn-small btn-go" type="button" id="save-keys">Save keys</button>
-      <button class="btn btn-small btn-ghost" type="button" id="check-keys">Check keys</button>
-      ${k.anthropic || k.openai ? `<button class="btn btn-small btn-danger" type="button" id="forget-keys">Remove keys from this device</button>` : ""}
+      <button class="btn btn-small btn-go" type="button" id="save-keys">Save key</button>
+      <button class="btn btn-small btn-ghost" type="button" id="check-keys">Check key</button>
+      ${k.openai ? `<button class="btn btn-small btn-danger" type="button" id="forget-keys">Remove key from this device</button>` : ""}
     </div>
     <p class="p-note" id="key-note" role="status"></p>
   </div>`;
@@ -185,24 +182,15 @@ function wireConnect() {
     if (n) n.textContent = text;
   };
   const check = async () => {
-    say("Checking keys...");
-    const { checkKeys } = await import("../direct.js");
-    const r = await checkKeys();
-    const word = { ok: "works ✅", bad: "was rejected ❌ (check for typos, or make a new key)", unreachable: "couldn't be reached (check the internet)", none: "not set" };
-    say(`Anthropic key ${word[r.anthropic]}. OpenAI key ${word[r.openai]}.`);
+    say("Checking the key...");
+    const { checkKey } = await import("../direct.js");
+    const word = { ok: "works ✅", bad: "was rejected ❌ (check for typos, or make a new key)", unreachable: "couldn't be reached (check the internet)", none: "isn't set" };
+    say(`OpenAI key ${word[await checkKey()]}.`);
   };
   $("#save-keys", root).addEventListener("click", async () => {
-    const k = getKeys();
-    const a = $("#key-anthropic", root).value.trim();
     const o = $("#key-openai", root).value.trim();
-    if (!a && !o) {
-      say("Paste a key first.");
-      return;
-    }
-    if (!setKeys({ anthropic: a || k.anthropic, openai: o || k.openai })) {
-      say("This browser won't let the page save anything (private browsing?). Try a regular window.");
-      return;
-    }
+    if (!o) return say("Paste a key first.");
+    if (!setKeys({ openai: o })) return say("This browser won't let the page save anything (private browsing?). Try a regular window.");
     resetBackend();
     await dashboard();
     await check();
@@ -212,7 +200,7 @@ function wireConnect() {
     setKeys({});
     resetBackend();
     await dashboard();
-    $("#key-note", root).textContent = "Keys removed from this device.";
+    say("Key removed from this device.");
   });
 }
 
