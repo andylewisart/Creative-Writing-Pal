@@ -7,6 +7,7 @@ import { NORMALIZE, TASKS, fullPrompt } from "./prompts.js";
 import { demoReply } from "./demo.js";
 
 let backend = null; // { kind, sample? }
+let paintOn = false; // server has an image-model key
 let detecting = null;
 
 export function detectBackend() {
@@ -24,6 +25,7 @@ export function detectBackend() {
       const res = await fetch("api/status", { headers: { accept: "application/json" } });
       if (res.ok) {
         const info = await res.json();
+        paintOn = info.paint === true;
         if (info.live) return (backend = { kind: "server" });
       }
     } catch {
@@ -33,6 +35,8 @@ export function detectBackend() {
   })();
   return detecting;
 }
+
+export const canPaint = () => paintOn;
 
 export function backendKind() {
   return backend?.kind || "detecting";
@@ -46,6 +50,7 @@ export class AIError extends Error {
 }
 
 const KID_MESSAGES = {
+  paint_limit: "The Creature Artist has painted so much today that the paint ran out! Come back tomorrow.",
   not_granted: "Sparky needs a grown-up to say yes before the real magic works. Practice magic is on for now!",
   rate_limited: "Whew, Sparky is out of breath! Wait a minute, then try again.",
   refused: "Sparky got confused by that one. Try writing it a different way!",
@@ -99,4 +104,43 @@ export async function ask(task, payload) {
   const clean = NORMALIZE[task](raw || {});
   if (raw?.__switchedToPractice) clean.switchedToPractice = true;
   return clean;
+}
+
+// Ask the server's image model to paint a creature. Resolves to a small
+// data: URL (shrunk in the browser so lots of cards fit in saved progress).
+export async function paint(creature) {
+  let res;
+  try {
+    res = await fetch("api/paint", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ creature }),
+    });
+  } catch (e) {
+    throw new AIError("network", e.message);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.image) throw new AIError(body.code || "default", body.error || `HTTP ${res.status}`);
+  return shrink(body.image, 512);
+}
+
+function shrink(src, size) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, size / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const webp = c.toDataURL("image/webp", 0.82);
+        resolve(webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/jpeg", 0.82));
+      } catch {
+        resolve(src);
+      }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
 }

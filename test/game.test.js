@@ -87,3 +87,15 @@ test("demo replies normalize cleanly for every task", () => {
   assert.match(creature.svg, /^<svg/);
   assert.match(creature.svg, /<path/); // wings were described, so they get drawn
 });
+
+test("paint prompt keeps the 'draws only what you write' rule", async () => {
+  const { paintPrompt } = await import("../public/js/prompts.js");
+  const plain = paintPrompt({ description: "it is a monster", habitat: "somewhere mysterious" });
+  assert.match(plain, /VERY short/);
+  assert.match(plain, /plain light gray/);
+  assert.match(plain, /softly glowing magical background/);
+  const rich = paintPrompt({ name: "Zapzilla", description: "A giant purple monster with orange wings that lives in a smoky volcano and breathes blue fire at night.", habitat: "a smoky volcano" });
+  assert.doesNotMatch(rich, /VERY short/);
+  assert.match(rich, /its home: a smoky volcano/);
+  assert.match(rich, /Zapzilla/);
+});

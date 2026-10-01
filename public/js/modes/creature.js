@@ -2,7 +2,7 @@
 // More details = a better drawing and stronger stats.
 
 import { get, update, award, countWords } from "../state.js";
-import { ask, kidMessage } from "../ai.js";
+import { ask, kidMessage, canPaint, paint, detectBackend } from "../ai.js";
 import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward } from "../ui.js";
 import { sfx, confetti } from "../fx.js";
 
@@ -36,11 +36,21 @@ export function imgSrc(svg) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
+// Show the painting when it matches the creature's current level, unless
+// the writer flipped the card to the other view.
+const showsPainting = (c) => Boolean(c.painting) && (c.view ? c.view === "painting" : c.paintedLevel === c.level);
+
 export function cardHtml(c) {
   const stat = (label, v) => `<div class="stat"><span>${label}</span><div class="stat-bar"><div style="width:${v}%"></div></div><b>${v}</b></div>`;
   return `<div class="creature-card rarity-${esc(c.rarity)}">
     <div class="card-top"><span class="card-name">${esc(c.name)}</span><span class="card-element" title="${esc(c.element)}">${ELEMENT_ICON[c.element] || "✨"} ${esc(c.element)}</span></div>
-    <div class="card-art">${c.svg ? `<img src="${imgSrc(c.svg)}" alt="Drawing of ${esc(c.name)}">` : `<div class="no-art">?</div>`}
+    <div class="card-art">${
+      showsPainting(c)
+        ? `<img src="${esc(c.painting)}" alt="Painting of ${esc(c.name)}"><span class="painted-badge">🎨 Painted${c.paintedLevel !== c.level ? ` at Lv ${c.paintedLevel}` : ""}</span>`
+        : c.svg
+          ? `<img src="${imgSrc(c.svg)}" alt="Drawing of ${esc(c.name)}">`
+          : `<div class="no-art">?</div>`
+    }
       <span class="card-level">Lv ${c.level}</span></div>
     <div class="card-sub"><span>${esc(c.species)}</span><span class="rarity-tag">${esc(c.rarity)}</span></div>
     <div class="card-stats">${stat("HP", c.hp)}${stat("ATK", c.attack)}${stat("DEF", c.defense)}${stat("MAGIC", c.magic)}</div>
@@ -113,6 +123,7 @@ function showCard() {
       <div class="upgrade-panel">
         <div class="artist-note">${sparkyHtml("happy", "small")}<p>${esc(c.artistNote)}</p></div>
         ${c.spells?.length ? `<div class="spell-list">${c.spells.map((s) => spellChip(s.id, s.quote)).join("")}</div>` : ""}
+        <div id="paint-box"></div>
         <h2>🧬 Evolve ${esc(c.name)}!</h2>
         <p class="upgrade-q">${esc(c.upgradeQuestion)}</p>
         ${writingDesk({ id: "evolve-text", placeholder: "Add more details...", rows: 3, goal: 15 })}
@@ -131,6 +142,62 @@ function showCard() {
     designer();
   });
   $("#evolve", root).addEventListener("click", () => evolve(ta.value.trim()));
+  detectBackend().then(() => paintBox(c));
+}
+
+function saveCreature(next) {
+  update((s) => {
+    const i = s.creatures.findIndex((x) => x.id === next.id);
+    if (i >= 0) s.creatures[i] = next;
+  });
+  current = next;
+}
+
+function paintBox(c) {
+  const box = $("#paint-box", root);
+  if (!box || current !== c || !canPaint()) return;
+  const fresh = c.painting && c.paintedLevel === c.level;
+  box.innerHTML = `<div class="paint-box">
+    ${
+      fresh
+        ? `<p>🖼️ Painted! Evolve ${esc(c.name)} and the artist can paint the new version.</p>`
+        : `<p>${c.painting ? `🧬 ${esc(c.name)} has evolved since the last painting!` : "✏️ That's the artist's quick sketch."} The Creature Artist can paint exactly what you wrote.</p>
+           <button class="btn btn-paint" type="button" id="paint">🎨 ${c.painting ? "Paint the new version!" : "Paint it for real!"}</button>`
+    }
+    ${c.painting ? `<button class="link-btn" type="button" id="flip">${showsPainting(c) ? "Show the sketch" : "Show the painting"}</button>` : ""}
+  </div>`;
+  $("#paint", box)?.addEventListener("click", doPaint);
+  $("#flip", box)?.addEventListener("click", () => {
+    saveCreature({ ...c, view: showsPainting(c) ? "sketch" : "painting" });
+    showCard();
+  });
+}
+
+async function doPaint() {
+  const c = current;
+  const box = $("#paint-box", root);
+  box.innerHTML = `<div class="paint-box painting-now" role="status"><span class="brush" aria-hidden="true">🖌️</span><p>The Creature Artist is painting ${esc(c.name)}... this takes a little while!</p></div>`;
+  $(".card-art", root).classList.add("painting");
+  $("#evolve", root).disabled = true;
+  $("#new", root).disabled = true;
+  sfx.click();
+  try {
+    const image = await paint({ name: c.name, description: c.description, habitat: c.habitat });
+    if (current?.id !== c.id) return;
+    saveCreature({ ...current, painting: image, paintedLevel: current.level, view: undefined });
+    showCard();
+    $(".card-wrap", root)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    sfx.level();
+    confetti(70);
+  } catch (e) {
+    if (current?.id !== c.id) return;
+    $(".card-art", root)?.classList.remove("painting");
+    $("#evolve", root).disabled = false;
+    $("#new", root).disabled = false;
+    box.innerHTML = `<div class="paint-box"><p>${esc(e.code === "refused" ? "The paint got smudged on that one. Try changing some words and evolving it!" : kidMessage(e))}</p>
+      ${e.code === "paint_limit" ? "" : `<button class="btn btn-paint" type="button" id="paint">🎨 Try painting again</button>`}</div>`;
+    $("#paint", box)?.addEventListener("click", doPaint);
+  }
 }
 
 async function evolve(addition) {
@@ -155,6 +222,7 @@ async function evolve(addition) {
     const next = {
       ...c,
       ...r,
+      view: undefined,
       name: c.name,
       description,
       level: c.level + 1,
@@ -163,11 +231,7 @@ async function evolve(addition) {
       defense: Math.max(r.defense, c.defense),
       magic: Math.max(r.magic, c.magic),
     };
-    update((s) => {
-      const i = s.creatures.findIndex((x) => x.id === c.id);
-      if (i >= 0) s.creatures[i] = next;
-    });
-    current = next;
+    saveCreature(next);
     const rarityBonus = Math.max(5, RARITY_GEMS[next.rarity] - RARITY_GEMS[c.rarity]);
     const result = award({ spells: r.spells, gems: rarityBonus, mode: "creature", text: addition });
     showCard();

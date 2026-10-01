@@ -57,6 +57,30 @@ npm start
 
 Other devices on your Wi-Fi, like a tablet, can open `http://<this-computer's-IP>:3000`. The server uses `claude-opus-5-5` by default; set `STORY_QUEST_MODEL` to change it.
 
+#### Painted creature art (optional, needs an OpenAI API key)
+
+Add an OpenAI API key, and the Creature Lab gets a **🎨 Paint it for real!** button. It turns the artist's quick sketch into a full illustration on the trading card.
+
+```bash
+# in .env, next to the Anthropic key
+OPENAI_API_KEY=sk-proj-...
+```
+
+- The painting prompt uses only your child's own words, plus a fixed kid-friendly cartoon style. Anything they didn't describe comes out plain: "it is a monster" gets a simple gray blob, and a detailed description gets the full beast.
+- You get one painting per creature level. Evolving a creature lets you paint the new version, and older paintings can still be viewed with "Show the painting".
+- The server allows 25 paintings per day by default. When the cap is reached, the artist says the paint ran out until tomorrow.
+- Paintings are shrunk to about 50 KB in the browser before saving. If storage ever fills up, the oldest paintings are dropped first; the sketch stays, and gems and books are never lost.
+- If OpenAI's safety filter rejects an image, the child sees "the paint got smudged" and the sketch stays.
+- A ChatGPT subscription doesn't include API access. The key comes from platform.openai.com, and each painting is billed there.
+- Painting only works through this server, not the claude.ai artifact version.
+
+| Setting | Default | |
+|---|---|---|
+| `OPENAI_IMAGE_MODEL` | `gpt-image-2.5-flare` | `gpt-image-2.5-sunburst` also works (a bit slower) |
+| `OPENAI_IMAGE_QUALITY` | `medium` | `low` is cheaper; `high`, `xhigh`, `max` cost more |
+| `OPENAI_IMAGE_SIZE` | `1024x1024` | |
+| `PAINTS_PER_DAY` | `25` | |
+
 ### Option C: practice magic (no AI)
 
 With no API key and outside claude.ai, the game still works. It uses simple word patterns to spot spells, pre-written chapters, and a code-drawn creature. That's good for trying it out, but the real AI is much better at reacting to what your child actually wrote.

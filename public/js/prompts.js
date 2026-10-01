@@ -309,6 +309,33 @@ Return:
   },
 };
 
+// The image-model prompt for a painted creature card. Built only from the
+// writer's own words, so the Creature Lab rule still holds: details you write
+// show up, details you skip stay plain.
+export function paintPrompt(c) {
+  // Only paint the habitat if the writer mentioned it themselves.
+  const desc = String(c.description).toLowerCase();
+  const habitatWords = String(c.habitat || "").toLowerCase().match(/[a-z]{4,}/g) || [];
+  const fromWriter = habitatWords.some((w) => desc.includes(w));
+  const home = fromWriter ? `its home: ${String(c.habitat).slice(0, 80)}` : "a simple, softly glowing magical background";
+  return `A collectible trading-card illustration of a made-up creature for a children's creative-writing game.
+
+An 8-year-old described the creature. Read misspellings the way they meant them:
+"""
+${String(c.description).slice(0, 2000)}
+"""
+${c.name ? `The creature's name is ${String(c.name).slice(0, 40)}.` : ""}
+
+Most important rule: paint exactly what the description says and add nothing extra. This is a game where the child earns a better picture by writing more details, so the picture must never be better than the writing.
+- Every detail the child wrote must be clearly visible: colors, body parts, how many eyes or legs, powers in action, size.
+- Do NOT invent anything they didn't mention: no extra colors, patterns, spots, fur, scales, horns, wings, spikes, tails, claws, teeth, extra eyes, accessories, or special effects.
+- Defaults for anything not described: a smooth, rounded body in plain light gray, two simple dot eyes, a small smile, stubby plain limbs.
+${wordCount(c.description) < 12 ? "- This description is VERY short, so paint a deliberately plain, simple creature that looks like a first sketch waiting for more details. Plain background.\n" : ""}
+Style: friendly cartoon for kids, thick clean outlines, the whole creature centered and facing the viewer, and ${home}. Cool or cute, never gory or truly scary. No text, letters, numbers, logos, card borders, or frames.`;
+}
+
+const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
+
 // Turn a JSON schema into a compact shape description, for backends that
 // can't enforce a schema (the artifact's Claude connection).
 export function describeShape(schema, indent = "") {

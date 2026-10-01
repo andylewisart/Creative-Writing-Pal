@@ -99,3 +99,70 @@ test("server retries without fallbacks if the account rejects them, and maps ref
     api.server.close();
   }
 });
+
+async function startPainter(fakePort, gamePort, extraEnv = {}) {
+  const child = spawn(process.execPath, ["server.js"], {
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: "",
+      OPENAI_API_KEY: "test-key",
+      OPENAI_BASE_URL: `http://127.0.0.1:${fakePort}/v1`,
+      PORT: String(gamePort),
+      HOST: "127.0.0.1",
+      ...extraEnv,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let out = "";
+  child.stdout.on("data", (d) => (out += d));
+  child.stderr.on("data", (d) => (out += d));
+  while (!out.includes("running at")) await once(child.stdout, "data");
+  return child;
+}
+
+const paintReq = (port, creature) =>
+  fetch(`http://127.0.0.1:${port}/api/paint`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creature }) });
+
+test("paint endpoint asks the image model for one opaque jpeg and enforces the daily cap", async () => {
+  const api = await fakeClaude(() => [200, { created: 1, data: [{ b64_json: "AAAA" }] }]);
+  const game = await startPainter(api.port, 3913, { PAINTS_PER_DAY: "2" });
+  try {
+    const status = await (await fetch("http://127.0.0.1:3913/api/status")).json();
+    assert.equal(status.paint, true);
+    assert.equal(status.live, false);
+
+    const res = await paintReq(3913, { name: "Zapzilla", description: "A giant purple monster with wings.", habitat: "a volcano" });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).image, "data:image/jpeg;base64,AAAA");
+    const req = api.seen[0];
+    assert.match(req.url, /\/v1\/images\/generations/);
+    assert.equal(req.body.model, "gpt-image-2.5-flare");
+    assert.equal(req.body.output_format, "jpeg");
+    assert.equal(req.body.n, 1);
+    assert.ok(req.body.prompt.includes("A giant purple monster with wings."));
+
+    assert.equal((await paintReq(3913, { description: "" })).status, 400);
+    assert.equal((await paintReq(3913, { description: "a blob" })).status, 200);
+    const capped = await paintReq(3913, { description: "a third blob" });
+    assert.equal(capped.status, 429);
+    assert.equal((await capped.json()).code, "paint_limit");
+  } finally {
+    game.kill();
+    api.server.close();
+  }
+});
+
+test("paint endpoint maps a moderation block to a friendly refusal and doesn't count it", async () => {
+  const api = await fakeClaude(() => [400, { error: { message: "Your request was rejected by the safety system.", type: "image_generation_user_error", code: "moderation_blocked" } }]);
+  const game = await startPainter(api.port, 3914, { PAINTS_PER_DAY: "1" });
+  try {
+    for (let i = 0; i < 2; i++) {
+      const res = await paintReq(3914, { description: "something" });
+      assert.equal(res.status, 400);
+      assert.equal((await res.json()).code, "refused");
+    }
+  } finally {
+    game.kill();
+    api.server.close();
+  }
+});

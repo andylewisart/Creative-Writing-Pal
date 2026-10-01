@@ -51,10 +51,19 @@ function load() {
 }
 
 export function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    /* storage unavailable: progress lasts for this visit only */
+  for (;;) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+      break;
+    } catch (e) {
+      // Storage full? Paintings are the big items: drop the oldest one
+      // (its sketch stays) and try again, so gems and books are never lost.
+      const painted = state.creatures.filter((c) => c.painting);
+      if (e?.name !== "QuotaExceededError" || !painted.length) break; // storage unavailable: this visit only
+      const oldest = painted[painted.length - 1];
+      oldest.painting = null;
+      oldest.paintedLevel = 0;
+    }
   }
   listeners.forEach((fn) => fn(state));
 }
