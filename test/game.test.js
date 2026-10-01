@@ -88,14 +88,17 @@ test("demo replies normalize cleanly for every task", () => {
   assert.match(creature.svg, /<path/); // wings were described, so they get drawn
 });
 
-test("paint prompt keeps the 'draws only what you write' rule", async () => {
-  const { paintPrompt } = await import("../public/js/prompts.js");
-  const plain = paintPrompt({ description: "it is a monster", habitat: "somewhere mysterious" });
-  assert.match(plain, /VERY short/);
-  assert.match(plain, /plain light gray/);
-  assert.match(plain, /softly glowing magical background/);
-  const rich = paintPrompt({ name: "Zapzilla", description: "A giant purple monster with orange wings that lives in a smoky volcano and breathes blue fire at night.", habitat: "a smoky volcano" });
-  assert.doesNotMatch(rich, /VERY short/);
-  assert.match(rich, /its home: a smoky volcano/);
-  assert.match(rich, /Zapzilla/);
+test("paint prompt keeps the 'draws only what you write' rule and climbs the art ladder", async () => {
+  const { paintPrompt, artTierFor } = await import("../public/js/prompts.js");
+  const plain = { description: "it is a monster", habitat: "somewhere mysterious", rarity: "epic" };
+  assert.equal(artTierFor(plain), "common", "a very short description is always a sketch");
+  assert.match(paintPrompt(plain), /pencil sketch/);
+  assert.match(paintPrompt(plain), /plain gray skin/);
+  assert.match(paintPrompt(plain), /didn't say where it lives/);
+  const rich = { name: "Zapzilla", rarity: "legendary", description: "A giant purple monster with orange wings that lives in a smoky volcano and breathes blue fire at night.", habitat: "a smoky volcano" };
+  assert.equal(artTierFor(rich), "legendary");
+  assert.match(paintPrompt(rich), /awe-inspiring cinematic/);
+  assert.match(paintPrompt(rich), /its home, a smoky volcano/);
+  assert.equal(artTierFor({ ...rich, rarity: "rare" }), "rare");
+  assert.match(paintPrompt({ ...rich, rarity: "rare" }), /concept painting/);
 });

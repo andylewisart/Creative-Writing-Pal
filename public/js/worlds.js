@@ -1,15 +1,18 @@
 export const WORLDS = [
   { id: "dragon", name: "Dragon Kingdom", icon: "🏰", blurb: "Castles, dragons, and a crown that's gone missing", hue: "#ff9f1c" },
-  { id: "space", name: "Galaxy Station", icon: "🚀", blurb: "Starships, aliens, and robots that beep", hue: "#5aa9ff" },
+  { id: "kaiju", name: "Kaiju Coast", icon: "🦎", blurb: "Giant monsters rise from the sea and stomp through a neon city", hue: "#e8553d" },
+  { id: "space", name: "Galaxy Rebellion", icon: "🚀", blurb: "Starfighters, laser swords, droids, and an evil empire", hue: "#5aa9ff" },
   { id: "forest", name: "Enchanted Forest", icon: "🌲", blurb: "Talking animals, fairies, and grumpy trolls", hue: "#7bd389" },
   { id: "ocean", name: "Sunken City", icon: "🌊", blurb: "Merfolk, sea monsters, and secret submarines", hue: "#3ddbd9" },
   { id: "academy", name: "Monster Academy", icon: "🧪", blurb: "A school of magic where the students are monsters", hue: "#c39bff" },
-  { id: "dino", name: "Dino Planet", icon: "🦖", blurb: "Dinosaurs with jetpacks and lava volcanoes", hue: "#ff5d8f" },
+  { id: "dino", name: "Dino Island", icon: "🦖", blurb: "A secret island park where the dinosaurs just escaped", hue: "#ff5d8f" },
 ];
 
 export const HERO_KINDS = [
   { id: "wizard", label: "Wizard", icon: "🧙", text: "a young wizard" },
   { id: "robot", label: "Robot", icon: "🤖", text: "a brave robot" },
+  { id: "pilot", label: "Space Pilot", icon: "🧑‍🚀", text: "a daring starfighter pilot" },
+  { id: "ranger", label: "Dino Ranger", icon: "🦕", text: "a dino ranger who rides a raptor" },
   { id: "rider", label: "Dragon Rider", icon: "🐉", text: "a dragon rider" },
   { id: "alien", label: "Alien Explorer", icon: "👽", text: "an alien explorer" },
   { id: "ninja", label: "Ninja", icon: "🥷", text: "a sneaky ninja" },
@@ -53,4 +56,9 @@ export const BORING_SENTENCES = [
   "The bridge was broken.",
   "The cave was dark.",
   "The car went fast.",
+  "The T-rex roared.",
+  "The monster was tall.",
+  "The spaceship shot a laser.",
+  "The robot had a sword.",
+  "The city was big.",
 ];

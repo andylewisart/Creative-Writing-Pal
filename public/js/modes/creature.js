@@ -5,9 +5,15 @@ import { get, update, award, countWords } from "../state.js";
 import { ask, kidMessage, canPaint, paint, detectBackend } from "../ai.js";
 import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward } from "../ui.js";
 import { sfx, confetti } from "../fx.js";
+import { ART_TIERS, artTierFor, nextArtTier } from "../prompts.js";
 
 let root, nav;
 let current = null; // the creature being built
+
+// The image service won't paint lookalikes of famous movie monsters. Turn that
+// into a creature-designer lesson instead of a dead end.
+const LOOKALIKE_TIP =
+  "The magic paint won't stick! That usually means your creature looks a LOT like a famous movie monster. Real creature designers make theirs one-of-a-kind. 🌀 Cast a Twist Spell: change its colors, give it a body part no movie monster has, or a power nobody has seen. Then evolve it and paint again!";
 
 const RARITY_GEMS = { common: 5, rare: 15, epic: 30, legendary: 50 };
 const ELEMENT_ICON = { fire: "🔥", water: "💧", earth: "🪨", air: "🌪️", lightning: "⚡", ice: "❄️", nature: "🌿", shadow: "🌑", light: "🌟", cosmic: "🌌", metal: "⚙️" };
@@ -46,7 +52,7 @@ export function cardHtml(c) {
     <div class="card-top"><span class="card-name">${esc(c.name)}</span><span class="card-element" title="${esc(c.element)}">${ELEMENT_ICON[c.element] || "✨"} ${esc(c.element)}</span></div>
     <div class="card-art">${
       showsPainting(c)
-        ? `<img src="${esc(c.painting)}" alt="Painting of ${esc(c.name)}"><span class="painted-badge">🎨 Painted${c.paintedLevel !== c.level ? ` at Lv ${c.paintedLevel}` : ""}</span>`
+        ? `<img src="${esc(c.painting)}" alt="Painting of ${esc(c.name)}"><span class="painted-badge">${esc(ART_TIERS[c.paintedTier]?.icon || "🎨")} ${esc(ART_TIERS[c.paintedTier]?.label || "Painted")}${c.paintedLevel !== c.level ? ` · Lv ${c.paintedLevel}` : ""}</span>`
         : c.svg
           ? `<img src="${imgSrc(c.svg)}" alt="Drawing of ${esc(c.name)}">`
           : `<div class="no-art">?</div>`
@@ -157,13 +163,24 @@ function paintBox(c) {
   const box = $("#paint-box", root);
   if (!box || current !== c || !canPaint()) return;
   const fresh = c.painting && c.paintedLevel === c.level;
+  const tierId = artTierFor(c);
+  const tier = ART_TIERS[tierId];
+  const nextId = nextArtTier(tierId);
+  const unlock = nextId
+    ? `<p class="tier-next">Add more details to make ${esc(c.name)} <b>${nextId.toUpperCase()}</b> and unlock ${ART_TIERS[nextId].icon} <b>${esc(ART_TIERS[nextId].label)}</b> art!</p>`
+    : `<p class="tier-next">🏆 You unlocked the best art there is!</p>`;
+  const ladder = `<div class="tier-ladder" aria-label="Art styles">${Object.entries(ART_TIERS)
+    .map(([id, t]) => `<span class="tier ${id === tierId ? "now" : ""}" title="${esc(t.label)}">${t.icon}<small>${esc(t.label)}</small></span>`)
+    .join("")}</div>`;
   box.innerHTML = `<div class="paint-box">
+    ${ladder}
     ${
       fresh
-        ? `<p>🖼️ Painted! Evolve ${esc(c.name)} and the artist can paint the new version.</p>`
-        : `<p>${c.painting ? `🧬 ${esc(c.name)} has evolved since the last painting!` : "✏️ That's the artist's quick sketch."} The Creature Artist can paint exactly what you wrote.</p>
-           <button class="btn btn-paint" type="button" id="paint">🎨 ${c.painting ? "Paint the new version!" : "Paint it for real!"}</button>`
+        ? `<p>🖼️ Painted as ${tier.icon} <b>${esc(ART_TIERS[c.paintedTier]?.label || tier.label)}</b>! Evolve ${esc(c.name)} and the artist can paint the new version.</p>`
+        : `<p>${c.painting ? `🧬 ${esc(c.name)} has evolved since the last painting!` : "That's the artist's quick sketch."} Right now your writing unlocks ${tier.icon} <b>${esc(tier.label)}</b> art.</p>
+           <button class="btn btn-paint" type="button" id="paint">🎨 Paint it! (${tier.icon} ${esc(tier.label)})</button>`
     }
+    ${unlock}
     ${c.painting ? `<button class="link-btn" type="button" id="flip">${showsPainting(c) ? "Show the sketch" : "Show the painting"}</button>` : ""}
   </div>`;
   $("#paint", box)?.addEventListener("click", doPaint);
@@ -182,9 +199,9 @@ async function doPaint() {
   $("#new", root).disabled = true;
   sfx.click();
   try {
-    const image = await paint({ name: c.name, description: c.description, habitat: c.habitat });
+    const image = await paint({ name: c.name, description: c.description, habitat: c.habitat, rarity: c.rarity });
     if (current?.id !== c.id) return;
-    saveCreature({ ...current, painting: image, paintedLevel: current.level, view: undefined });
+    saveCreature({ ...current, painting: image, paintedLevel: current.level, paintedTier: artTierFor(c), view: undefined });
     showCard();
     $(".card-wrap", root)?.scrollIntoView({ block: "start", behavior: "smooth" });
     sfx.level();
@@ -194,8 +211,8 @@ async function doPaint() {
     $(".card-art", root)?.classList.remove("painting");
     $("#evolve", root).disabled = false;
     $("#new", root).disabled = false;
-    box.innerHTML = `<div class="paint-box"><p>${esc(e.code === "refused" ? "The paint got smudged on that one. Try changing some words and evolving it!" : kidMessage(e))}</p>
-      ${e.code === "paint_limit" ? "" : `<button class="btn btn-paint" type="button" id="paint">🎨 Try painting again</button>`}</div>`;
+    box.innerHTML = `<div class="paint-box"><p>${esc(e.code === "refused" ? LOOKALIKE_TIP : kidMessage(e))}</p>
+      ${e.code === "paint_limit" || e.code === "refused" ? "" : `<button class="btn btn-paint" type="button" id="paint">🎨 Try painting again</button>`}</div>`;
     $("#paint", box)?.addEventListener("click", doPaint);
   }
 }

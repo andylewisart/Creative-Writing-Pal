@@ -4,6 +4,8 @@
 
 import { SPELL_IDS } from "./spells.js";
 
+const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
+
 export const GUIDE = `You are the Story Guide inside "Story Quest", a creative-writing game for a 3rd grader (about 8 years old) who loves magic, fantasy, creatures, and sci-fi. Their writing tends to be short and literal. Your job is to make writing feel like magic and to grow their writing one small, fun step at a time. You speak through Sparky, a friendly little dragon who eats words and grows when fed great writing.
 
 How to talk:
@@ -17,7 +19,7 @@ Teaching rules (follow every one):
 4. Ask, don't tell. To nudge for more, ask ONE curious question about a single detail (what it looked or sounded or felt like, what someone said, how someone felt). Never give a list of fixes.
 5. Never write their part for them. Ideas you offer are questions or choices, not finished sentences for them to copy.
 6. Their ideas are canon. If they add a laser-shooting penguin, the story now has a laser-shooting penguin. Build on their ideas; never undo or ignore them.
-7. Kid-safe: cartoon peril, spooky-fun, and fantasy battles are fine. No gore, nothing truly frightening, no romance. If they write something mean or inappropriate, steer the story somewhere fun without lecturing.
+7. Not babyish, but kid-safe. This writer loves giant-monster movies, dinosaur thrillers, and space battles, so epic action, fierce roaring monsters, starship dogfights, and big battles are great. No blood, gore, injuries described in detail, or anything cruel, and no romance. If they write something mean or inappropriate, steer the story somewhere fun without lecturing.
 8. In your own story writing, model the spells below so they see what great writing looks like.
 
 The spells (writing moves) the writer can cast. Use these ids exactly:
@@ -277,13 +279,13 @@ The big rule of Creature Lab: the Creature Artist draws ONLY what the writer des
 
 Return:
 - name, species (a fun 1-3 word kind of creature), element (one of the listed options), habitat (where it lives, from their words if given).
-- rarity: common for a bare-bones description, rare for a few details, epic for lots of details, legendary for an amazingly detailed and creative one.
+- rarity (this also decides the art style the writer unlocks, so judge it fairly by the DESCRIPTION, not the creature's coolness): common = bare-bones, one or two plain details; rare = several concrete details (like colors plus body parts); epic = rich details across most of: body, colors, special parts, powers, sounds, home; legendary = epic-level detail plus vivid writing (comparisons, sounds, strong verbs) and a creative idea.
 - hp, attack, defense, magic: integers from 10 to 100. More vivid details mean higher stats. Upgrades always go up.
 - abilities: 1-3 abilities taken from their description, each with a cool name and a one-sentence effect.
 - spells: the spells in their writing (for an upgrade, only the newly added words).
 - artistNote: Sparky's comment (1-2 sentences) naming a detail that made the drawing better, plus one thing the artist had to guess.
-- upgradeQuestion: ONE curious question about a detail the artist could not draw yet.
-- svg: the drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; cute, bold cartoon style with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large with big friendly eyes; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
+- upgradeQuestion: ONE curious question about a detail the artist could not draw yet. If the creature is basically a copy of a famous movie, TV, or game character, celebrate the idea and make this question invite a twist that makes it one-of-a-kind (the painter can't paint copies of famous characters).
+- svg: the drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; bold, cool cartoon style (fierce is fine, never babyish) with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
     schema: obj({
       name: str("creature name"),
       species: str("kind of creature"),
@@ -309,32 +311,59 @@ Return:
   },
 };
 
+// Painted art gets cooler as the writing gets more detailed. The card's
+// rarity (judged by Claude from the description) picks the art style.
+export const ART_TIERS = {
+  common: {
+    label: "Pencil sketch",
+    icon: "✏️",
+    style: `A rough, unfinished graphite pencil sketch on plain off-white sketchbook paper: loose construction lines, light shading, NO color at all, no background. It should look like the first page of a creature designer's sketchbook, waiting for more details.`,
+  },
+  rare: {
+    label: "Concept art",
+    icon: "🖌️",
+    style: `A detailed digital concept painting, like professional creature design art for a fantasy or sci-fi movie: realistic textures (skin, scales, armor, fur only if described), dramatic lighting, a strong pose, and a simple moody background.`,
+  },
+  epic: {
+    label: "Movie poster",
+    icon: "🎬",
+    style: `An epic, cinematic shot, like the hero creature of a blockbuster giant-monster or dinosaur-thriller movie: photorealistic textures, massive sense of scale, dramatic low camera angle, volumetric light and atmosphere (smoke, rain, sparks, or starlight as fits its home), deep shadows and rich color.`,
+  },
+  legendary: {
+    label: "Legendary poster",
+    icon: "🏆",
+    style: `The most awe-inspiring cinematic shot possible, like the climactic reveal of the creature in a blockbuster giant-monster, dinosaur, or space-opera movie: photorealistic textures, colossal scale with tiny details for comparison, dramatic low camera angle, volumetric god-rays and atmosphere, every described power shown in full force.`,
+  },
+};
+
+const NEXT_TIER = { common: "rare", rare: "epic", epic: "legendary" };
+export const nextArtTier = (rarity) => NEXT_TIER[rarity] || null;
+export const artTierFor = (c) => (wordCount(c.description) < 12 ? "common" : ART_TIERS[c.rarity] ? c.rarity : "common");
+
 // The image-model prompt for a painted creature card. Built only from the
-// writer's own words, so the Creature Lab rule still holds: details you write
-// show up, details you skip stay plain.
+// writer's own words: details they wrote show up, details they skipped stay plain.
 export function paintPrompt(c) {
+  const tier = ART_TIERS[artTierFor(c)];
   // Only paint the habitat if the writer mentioned it themselves.
   const desc = String(c.description).toLowerCase();
   const habitatWords = String(c.habitat || "").toLowerCase().match(/[a-z]{4,}/g) || [];
   const fromWriter = habitatWords.some((w) => desc.includes(w));
-  const home = fromWriter ? `its home: ${String(c.habitat).slice(0, 80)}` : "a simple, softly glowing magical background";
-  return `A collectible trading-card illustration of a made-up creature for a children's creative-writing game.
-
-An 8-year-old described the creature. Read misspellings the way they meant them:
+  const home = fromWriter ? `Setting: its home, ${String(c.habitat).slice(0, 80)}.` : "Setting: a plain, dark, misty background (the writer didn't say where it lives).";
+  return `An original creature for a creative-writing game. A child described it. Read misspellings the way they meant them:
 """
 ${String(c.description).slice(0, 2000)}
 """
 ${c.name ? `The creature's name is ${String(c.name).slice(0, 40)}.` : ""}
 
-Most important rule: paint exactly what the description says and add nothing extra. This is a game where the child earns a better picture by writing more details, so the picture must never be better than the writing.
-- Every detail the child wrote must be clearly visible: colors, body parts, how many eyes or legs, powers in action, size.
-- Do NOT invent anything they didn't mention: no extra colors, patterns, spots, fur, scales, horns, wings, spikes, tails, claws, teeth, extra eyes, accessories, or special effects.
-- Defaults for anything not described: a smooth, rounded body in plain light gray, two simple dot eyes, a small smile, stubby plain limbs.
-${wordCount(c.description) < 12 ? "- This description is VERY short, so paint a deliberately plain, simple creature that looks like a first sketch waiting for more details. Plain background.\n" : ""}
-Style: friendly cartoon for kids, thick clean outlines, the whole creature centered and facing the viewer, and ${home}. Cool or cute, never gory or truly scary. No text, letters, numbers, logos, card borders, or frames.`;
-}
+Most important rule: show exactly what the description says and add nothing extra. In this game the child earns better pictures by writing more details, so the picture must never be more detailed than the writing.
+- Every detail the child wrote must be clearly visible: colors, body parts, how many eyes or legs, size, powers in action.
+- Do NOT invent anything they didn't mention: no extra colors, patterns, spikes, horns, wings, tails, armor, extra eyes, accessories, or effects.
+- For anything not described, use plain defaults: a simple body shape, plain gray skin, ordinary eyes.
 
-const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
+Style: ${tier.style}
+${home}
+It can look fierce, powerful, and intimidating (roaring, glowing eyes, battle-ready), but no blood, gore, wounds, or victims. Completely original design. No text, letters, numbers, logos, borders, or frames.`;
+}
 
 // Turn a JSON schema into a compact shape description, for backends that
 // can't enforce a schema (the artifact's Claude connection).

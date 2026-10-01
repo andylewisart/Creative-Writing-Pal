@@ -23,7 +23,7 @@ Spells light up while the child types. Claude then confirms which ones they real
 
 ## Game modes
 
-- **🗺️ Story Quest**: pick a world (Dragon Kingdom, Galaxy Station, Sunken City...) and invent a hero. Claude writes a chapter that ends on a cliffhanger, the child writes what happens next, and they take turns. After each turn, Sparky asks **one** curious question ("What did the troll's roar sound like?"). Answering it is a **power-up** that adds a sentence to the child's part and earns bonus gems. This is revision, framed as a reward. Finished stories become books in the library, with a title, an award, and Sparky's favorite line.
+- **🗺️ Story Quest**: pick a world (Kaiju Coast, Galaxy Rebellion, Dino Island, Dragon Kingdom...) and invent a hero. Claude writes a chapter that ends on a cliffhanger, the child writes what happens next, and they take turns. After each turn, Sparky asks **one** curious question ("What did the troll's roar sound like?"). Answering it is a **power-up** that adds a sentence to the child's part and earns bonus gems. This is revision, framed as a reward. Finished stories become books in the library, with a title, an award, and Sparky's favorite line.
 - **⚡ Boring-to-EPIC**: the Boring-o-Tron 3000 shows a dull sentence ("The dog ran."). The child rewrites it and the Epic-o-meter scores it 1–10. Gems come only from beating your own best, so the fun is in revising. A movie-trailer voice reads the result aloud.
 - **🐲 Creature Lab**: describe a creature and get a collectible trading card with an AI drawing. The catch is that **the artist draws only what you write**. "A monster" gets you a plain blob; "purple scales, three glowing eyes, and bat wings" gets you a real beast with higher stats. Evolve the creature by answering the artist's question.
 
@@ -59,7 +59,16 @@ Other devices on your Wi-Fi, like a tablet, can open `http://<this-computer's-IP
 
 #### Painted creature art (optional, needs an OpenAI API key)
 
-Add an OpenAI API key, and the Creature Lab gets a **🎨 Paint it for real!** button. It turns the artist's quick sketch into a full illustration on the trading card.
+Add an OpenAI API key, and the Creature Lab gets a **🎨 Paint it!** button. It turns the artist's quick sketch into real artwork on the trading card. **The art gets cooler as the writing gets more detailed.** The card's rarity, which Claude judges from the description, picks the style:
+
+| Rarity | Art style |
+|---|---|
+| Common (bare-bones, or under 12 words) | ✏️ rough pencil sketch, no color |
+| Rare | 🖌️ movie concept art: realistic textures, dramatic light |
+| Epic | 🎬 blockbuster monster-movie shot: huge scale, low camera angle, atmosphere |
+| Legendary | 🏆 the most epic cinematic reveal |
+
+The card shows the ladder and what the next tier unlocks. Creatures can look fierce, but the prompt rules out blood and gore.
 
 ```bash
 # in .env, next to the Anthropic key
@@ -70,7 +79,7 @@ OPENAI_API_KEY=sk-proj-...
 - You get one painting per creature level. Evolving a creature lets you paint the new version, and older paintings can still be viewed with "Show the painting".
 - The server allows 25 paintings per day by default. When the cap is reached, the artist says the paint ran out until tomorrow.
 - Paintings are shrunk to about 50 KB in the browser before saving. If storage ever fills up, the oldest paintings are dropped first; the sketch stays, and gems and books are never lost.
-- If OpenAI's safety filter rejects an image, the child sees "the paint got smudged" and the sketch stays.
+- OpenAI won't paint lookalikes of famous characters. A creature with dark scales and glowing blue back spikes gets blocked for looking like Godzilla. When that happens, Sparky explains that real creature designers make theirs one-of-a-kind and suggests a Twist Spell (new colors, a body part no movie monster has), and the sketch stays. Claude's evolve question also nudges toward originality when a creature is a copy.
 - A ChatGPT subscription doesn't include API access. The key comes from platform.openai.com, and each painting is billed there.
 - Painting only works through this server, not the claude.ai artifact version.
 
