@@ -559,3 +559,13 @@ button { font: inherit; cursor: pointer; }
 @media (max-width: 520px) {
   .detail-stars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---------- Story power ---------- */
+.story-power { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; color: var(--star); text-align: center; }
+.power-line { display: grid; gap: 2px; font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; color: var(--fire); }
+.power-line small { font-family: var(--font-body); font-weight: 600; font-size: .95rem; color: var(--text); }
+.chapter-power { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 999px; font-family: var(--font-display); font-weight: 800; font-size: .85rem; background: #efe2c2; color: #6b4a1a; }
+.page-ai.power-mega .chapter-power { background: linear-gradient(90deg, #ff9f1c, #ff5d8f); color: #fff; }
+.page-ai.power-blaze .chapter-power { background: #ffcf8a; color: #6b2a12; }
+.page-ai.power-tiny .chapter-power { background: #e6e1d6; color: #8a8478; }
+.page-ai.power-tiny p { color: #7b6f60; }

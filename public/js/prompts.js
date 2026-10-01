@@ -2,7 +2,7 @@
 // Shared by the browser (artifact mode) and server.js (API-key mode),
 // so both backends behave the same way.
 
-import { SPELL_IDS } from "./spells.js";
+import { SPELL_IDS, powerById } from "./spells.js";
 import { DETAILS, DETAIL_IDS, rarityFromStars, countStars, STARS_FOR } from "./details.js";
 
 const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
@@ -177,12 +177,20 @@ Decide:
     tier: "default",
     build: (p) => {
       const turnsLeft = p.totalTurns - p.turnNumber;
+      // Story power: the writer's spells decide how exciting this chapter may be.
+      const POWER_RULES = {
+        tiny: "STORY POWER: TINY. Their part was plain, with no writing spells. Write a SHORT, plain chapter (25-40 words, 2-3 simple sentences): the story moves forward a little, but nothing exciting happens, with no new creature, no surprise, and no big action. Do not scold or explain; just keep it small and plain. (Exciting writing unlocks exciting chapters; that is the game.)",
+        spark: "STORY POWER: SPARK. Their part had one writing spell. Write a modest chapter (45-65 words) with one small surprise. Keep it fun but not big.",
+        blaze: "STORY POWER: BLAZE. Their part had two writing spells. Write an exciting chapter (80-110 words) with a new event, creature, or problem and vivid details.",
+        mega: "STORY POWER: MEGA. Their part had three or more writing spells! Write an EPIC chapter (110-150 words): a big twist, a dramatic new creature or battle, the most vivid and exciting writing yet, and a jaw-dropping cliffhanger.",
+      };
+      const power = POWER_RULES[p.power] || POWER_RULES.blaze;
       const pacing =
         turnsLeft <= 0
-          ? "This was the writer's FINAL part: they wrote the ending. Write a short closing scene (50-90 words) that honors their ending exactly as they wrote it and ends with the words 'The End.' The bonus should invite one last detail anyway."
+          ? `This was the writer's FINAL part: they wrote the ending. Write a closing scene that honors their ending exactly as they wrote it and ends with the words 'The End.' Its size and excitement follow the story power: ${power} The bonus should invite one last detail anyway.`
           : turnsLeft === 1
-            ? "The writer has ONE part left. Write the next chapter (80-130 words) building up to the big final moment, and end by asking how the adventure ends."
-            : "Write the next chapter (80-130 words). Build on what they wrote, add a new surprise, problem, or creature, and end on a cliffhanger asking what the hero does next.";
+            ? `The writer has ONE part left. ${power} Build toward the big final moment, and end by asking how the adventure ends.`
+            : `${power} Build on what they wrote and end by asking what the hero does next.`;
       return `TASK: Continue the co-written story.
 
 Writer's name: ${p.writerName}

@@ -23,7 +23,7 @@ export function describe(e) {
     case "powerup.shown": return `  Power-up${e.attempt > 1 ? ` (try ${e.attempt}, with frame ${q(e.frame)})` : ""}: ${q(e.question)} on sentence ${q(e.target)}`;
     case "powerup.try": return `  REVISED try ${e.attempt}: ${q(e.before)} -> ${q(e.after)} => ${!e.changed ? "no change" : e.woven ? "woven in" : "tacked on"}${e.spells?.length ? ` | spells: ${spells(e.spells)}` : ""}`;
     case "powerup.skip": return `  Skipped the power-up (try ${e.attempt}${e.secs ? `, after ${e.secs}s` : ""})`;
-    case "quest.chapter": return `  Story continued (turn ${e.turn})`;
+    case "quest.chapter": return `  Story continued (turn ${e.turn}${e.power ? `, ${e.power} power` : ""})`;
     case "quest.finish": return `FINISHED a book: ${q(e.title)}, ${e.words} words, ${e.spells} spells, ${e.mins} min. Favorite line: ${q(e.favoriteLine)}`;
     case "quest.abandon": return `Abandoned a story at part ${e.turn}: ${q(e.title)}`;
     case "spark": return `  Used the idea crystal${e.draft ? ` (draft ${q(e.draft)})` : ""}`;

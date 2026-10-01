@@ -82,7 +82,7 @@ export function wireDesk(root) {
 }
 
 // The big reward moment after the writer submits something.
-export function showReward({ cheer, spells = [], result, title = "Spells cast!", mood = "chomp" }) {
+export function showReward({ cheer, spells = [], result, title = "Spells cast!", mood = "chomp", power = "" }) {
   return new Promise((resolve) => {
     const { gained, newSpells, levelUp } = result;
     const overlay = el(`<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -91,6 +91,7 @@ export function showReward({ cheer, spells = [], result, title = "Spells cast!",
         <p class="cheer">${esc(cheer)}</p>
         ${spells.length ? `<h3>${esc(title)}</h3><div class="spell-list">${spells.map((s, i) => `<div class="pop" style="animation-delay:${0.25 + i * 0.25}s">${spellChip(s.id, s.quote)}</div>`).join("")}</div>` : ""}
         ${newSpells.length ? `<div class="new-spell pop" style="animation-delay:${0.4 + spells.length * 0.25}s">📖 NEW SPELL LEARNED: ${newSpells.map((id) => `${spellById[id].icon} ${esc(spellById[id].name)}`).join(", ")}!</div>` : ""}
+        ${power ? `<div class="power-line pop" style="animation-delay:${0.2 + spells.length * 0.25}s">${power}</div>` : ""}
         ${gained ? `<div class="gem-gain pop" style="animation-delay:${0.3 + spells.length * 0.25}s">+${gained} 💎</div>` : ""}
         ${levelUp ? `<div class="level-up pop" style="animation-delay:${0.6 + spells.length * 0.25}s">🎉 Sparky grew! Now a <b>${esc(levelUp.name)}</b>!</div>` : ""}
         <button class="btn btn-go" type="button">Awesome! →</button>

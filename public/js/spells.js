@@ -97,3 +97,28 @@ export const RANKS = [
 export function rankFor(count) {
   return RANKS.find((r) => count >= r.min) || null;
 }
+
+// Story power: the spells in the writer's part decide how exciting the
+// next chapter is, so interesting writing visibly earns interesting story.
+export const POWER = [
+  { id: "tiny", min: 0, icon: "🕯️", label: "Tiny" },
+  { id: "spark", min: 1, icon: "⚡", label: "Spark" },
+  { id: "blaze", min: 2, icon: "🔥", label: "Blaze" },
+  { id: "mega", min: 3, icon: "🌋", label: "MEGA" },
+];
+export const powerById = Object.fromEntries(POWER.map((p) => [p.id, p]));
+
+export function powerFor(spellCount) {
+  let p = POWER[0];
+  for (const level of POWER) if (spellCount >= level.min) p = level;
+  return p;
+}
+
+// "1 more spell for a 🔥 Blaze chapter!" (or the top-level cheer).
+export function powerHint(spellCount) {
+  const now = powerFor(spellCount);
+  const next = POWER[POWER.indexOf(now) + 1];
+  if (!next) return `${now.icon} ${now.label} power! Your next chapter will be EPIC!`;
+  const need = next.min - spellCount;
+  return `${now.icon} ${now.label} power · ${need} more spell${need === 1 ? "" : "s"} for a ${next.icon} ${next.label} chapter!`;
+}

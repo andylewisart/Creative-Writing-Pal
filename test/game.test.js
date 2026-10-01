@@ -139,3 +139,18 @@ test("detail stars light up from the child's words and set the rarity", async ()
   const r = NORMALIZE.creature_create({ rarity: "legendary", details: { body: { has: true, quote: "big" } } });
   assert.equal(r.rarity, "common", "rarity comes from the stars, not the model's word");
 });
+
+test("story power: spells decide how exciting the next chapter is", async () => {
+  const { powerFor, powerHint } = await import("../public/js/spells.js");
+  assert.equal(powerFor(0).id, "tiny");
+  assert.equal(powerFor(1).id, "spark");
+  assert.equal(powerFor(2).id, "blaze");
+  assert.equal(powerFor(5).id, "mega");
+  assert.match(powerHint(1), /1 more spell for a 🔥 Blaze chapter/);
+  const tiny = TASKS.quest_continue.build({ ...quest, power: "tiny" });
+  const mega = TASKS.quest_continue.build({ ...quest, power: "mega" });
+  assert.match(tiny, /STORY POWER: TINY/);
+  assert.match(tiny, /nothing exciting happens/);
+  assert.match(mega, /STORY POWER: MEGA/);
+  assert.equal(demoReply("quest_continue", { ...quest, power: "tiny" }).chapter.split(/\s+/).length < 20, true);
+});

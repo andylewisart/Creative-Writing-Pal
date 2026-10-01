@@ -5,7 +5,8 @@ import { ask, kidMessage, detectBackend } from "../ai.js";
 import { WORLDS, HERO_KINDS, POWER_IDEAS } from "../worlds.js";
 import { esc, el, $, $$, writingDesk, wireDesk, showReward, challengeHtml, loadingHtml, spellChip, sparkyHtml, toast } from "../ui.js";
 import { sfx, speak, stopSpeaking, canSpeak, confetti, prefetchSpeech } from "../fx.js";
-import { spellById } from "../spells.js";
+import { spellById, powerFor, powerHint, powerById } from "../spells.js";
+import { detectSpells } from "../demo.js";
 import { splitSentences } from "../demo.js";
 import { logEvent } from "../log.js";
 import { talkButtonHtml, wireTalk } from "../voice.js";
@@ -141,7 +142,8 @@ function storyHtml(q) {
     ${q.story
       .map((p, i) =>
         p.author === "ai"
-          ? `<section class="page page-ai">
+          ? `<section class="page page-ai${p.power ? ` power-${p.power}` : ""}">
+              ${p.power ? `<span class="chapter-power">${powerById[p.power].icon} ${esc(powerById[p.power].label)} chapter</span>` : ""}
               ${p.emojis ? `<div class="scene" aria-hidden="true">${esc(p.emojis)}</div>` : ""}
               <p>${esc(p.text)}</p>
               ${canSpeak() ? `<button class="read-btn" type="button" data-read="${i}" aria-label="Read this part out loud">🔊 Read to me</button>` : ""}
@@ -198,6 +200,7 @@ function writeTurn(draftText = "") {
         </div>
         ${challengeHtml(q.bonus, "Bonus +15 💎")}
         ${writingDesk({ id: "kid-text", placeholder: last ? "Write the big ending..." : `${q.hero.name}...`, value: draftText })}
+        <p class="story-power" id="story-power" aria-live="polite"></p>
         <div class="spark-box" id="spark-box" hidden></div>
         <p class="form-error" id="turn-error" role="alert" hidden></p>
         <div class="turn-actions">
@@ -214,6 +217,11 @@ function writeTurn(draftText = "") {
   wireReading(root, q);
   const ta = wireDesk($(".desk", root));
   q.turnShownAt ||= Date.now();
+  // Spells light up as he types; the power line says what they'll unlock.
+  const powerLine = $("#story-power", root);
+  const showPower = () => (powerLine.textContent = `🔋 Story power: ${powerHint(detectSpells(ta.value).length)}`);
+  ta.addEventListener("input", showPower);
+  showPower();
   ta.addEventListener("input", () => {
     q.draft = ta.value;
   });
@@ -293,7 +301,13 @@ async function submitTurn(q, text) {
   q.draft = "";
   update((s) => (s.activeQuest = q));
   const result = award({ spells: r.spells, gems: r.bonusDone ? 15 : 0, mode: "quest", text });
-  await showReward({ cheer: r.cheer + (r.bonusDone ? " BONUS QUEST COMPLETE! +15 💎" : ""), spells: r.spells, result });
+  const earned = powerFor(r.spells.length);
+  await showReward({
+    cheer: r.cheer + (r.bonusDone ? " BONUS QUEST COMPLETE! +15 💎" : ""),
+    spells: r.spells,
+    result,
+    power: `${earned.icon} ${earned.label} story power!<small>${earned.id === "tiny" ? "Plain writing makes a plain chapter. Power up your sentence to boost it!" : earned.id === "mega" ? "Your next chapter will be EPIC!" : "Power up your sentence to boost it even more!"}</small>`,
+  });
   powerUpPanel(q, r.powerUp);
 }
 
@@ -313,7 +327,7 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
       <div class="turn-panel powerup" id="turn-panel">
         <div class="powerup-head">
           ${sparkyHtml(coach ? "happy" : "wow", "small bounce")}
-          <div><span class="turn-count">⚡ Power-up · +15 💎</span>
+          <div><span class="turn-count">⚡ Power-up · +15 💎 · ${powerFor(kidPart.spells?.length || 0).icon} ${powerFor(kidPart.spells?.length || 0).label} story power now</span>
           <h2>${esc(coach ? coach.cheer : powerUp.prompt)}</h2></div>
         </div>
         ${
@@ -384,12 +398,21 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
       return powerUpPanel(q, powerUp, attempt + 1, { cheer: r.cheer, frame: r.frame, lastTry: after });
     }
     // Put the revised sentence back into the writer's part.
+    const spellsBefore = kidPart.spells?.length || 0;
     const before = kidPart.text;
     kidPart.text = before.includes(target) ? before.replace(target, after) : `${before} ${after}`;
     kidPart.spells = mergeSpells(kidPart.spells, r.spells);
     update((st) => (st.activeQuest = q));
     const result = award({ spells: r.spells, gems: r.woven ? 15 : 5, mode: "powerup", text: after });
-    await showReward({ cheer: r.cheer, spells: r.spells, result, title: "Power-up spells!", mood: "wow" });
+    const was = powerFor(spellsBefore), now = powerFor(kidPart.spells.length);
+    await showReward({
+      cheer: r.cheer,
+      spells: r.spells,
+      result,
+      title: "Power-up spells!",
+      mood: "wow",
+      power: now !== was ? `Power boost! ${was.icon} ${was.label} → ${now.icon} ${now.label}!` : "",
+    });
     q.revision = null;
     continueStory(q, before);
   });
@@ -414,6 +437,7 @@ async function continueStory(q, revisedFrom) {
       story: q.story,
       kidText: kidPart.text,
       revisedFrom,
+      power: powerFor(kidPart.spells?.length || 0).id,
       turnNumber: q.turn,
       totalTurns: q.totalTurns,
     });
@@ -423,8 +447,9 @@ async function continueStory(q, revisedFrom) {
     $("#retry", root).addEventListener("click", () => continueStory(q, revisedFrom));
     return;
   }
-  logEvent("quest.chapter", { turn: q.turn, chapter: r.chapter, bonus: r.bonus.prompt });
-  q.story.push({ author: "ai", text: r.chapter, emojis: r.sceneEmojis });
+  const power = powerFor(kidPart.spells?.length || 0).id;
+  logEvent("quest.chapter", { turn: q.turn, power, chapter: r.chapter, bonus: r.bonus.prompt });
+  q.story.push({ author: "ai", text: r.chapter, emojis: r.sceneEmojis, power });
   q.bonus = r.bonus;
   q.justArrived = true;
   if (q.turn >= q.totalTurns) {

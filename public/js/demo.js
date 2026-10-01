@@ -207,7 +207,10 @@ export function demoReply(task, p) {
       const h = heroOf(p);
       const left = p.totalTurns - p.turnNumber;
       return {
-        chapter: left <= 0 ? ENDING(h) : left === 1 ? FINAL_SETUP(h) : NEXT_CHAPTERS[(p.turnNumber - 1) % NEXT_CHAPTERS.length](h),
+        chapter:
+          p.power === "tiny" && left > 0
+            ? `${h.name} walked a little farther. Nothing much happened. What does ${h.name} do next?`
+            : left <= 0 ? ENDING(h) : left === 1 ? FINAL_SETUP(h) : NEXT_CHAPTERS[(p.turnNumber - 1) % NEXT_CHAPTERS.length](h),
         sceneEmojis: pick(["🌀🗝️✨", "🦊👀💥", "🍄🏰👑", "⚡🐉🌋", "🌙⭐🚀"]),
         bonus: challengeFor([]),
       };
