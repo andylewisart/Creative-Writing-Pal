@@ -11,6 +11,7 @@ import { talkButtonHtml, wireTalk } from "../voice.js";
 
 let root, nav;
 let current = null; // the creature being built
+let paintingId = null; // the creature whose painting is in progress
 
 // The image service won't paint lookalikes of famous movie monsters. Turn that
 // into a creature-designer lesson instead of a dead end.
@@ -118,6 +119,7 @@ async function create(description, name) {
     current = c;
     const result = award({ spells: r.spells, gems: RARITY_GEMS[r.rarity], mode: "creature", text: description });
     showCard();
+    autoPaint();
     if (r.rarity === "legendary" || r.rarity === "epic") confetti(80);
     await showReward({ cheer: `You discovered ${r.name}! ${r.artistNote}`, spells: r.spells, result, mood: "wow" });
   } catch (e) {
@@ -178,9 +180,19 @@ function saveCreature(next) {
   current = next;
 }
 
+// When painting is available, paint right away: the quick sketch shows
+// first, then the real art replaces it. The button stays for retries.
+async function autoPaint() {
+  await detectBackend();
+  const c = current;
+  if (!c || !canPaint() || paintingId === c.id) return;
+  if (c.painting && c.paintedLevel === c.level) return;
+  doPaint();
+}
+
 function paintBox(c) {
   const box = $("#paint-box", root);
-  if (!box || current !== c || !canPaint()) return;
+  if (!box || current !== c || !canPaint() || paintingId === c.id) return;
   const fresh = c.painting && c.paintedLevel === c.level;
   const tierId = artTierFor(c);
   const tier = ART_TIERS[tierId];
@@ -211,14 +223,15 @@ function paintBox(c) {
 
 async function doPaint() {
   const c = current;
+  paintingId = c.id;
   const box = $("#paint-box", root);
-  box.innerHTML = `<div class="paint-box painting-now" role="status"><span class="brush" aria-hidden="true">🖌️</span><p>The Creature Artist is painting ${esc(c.name)}... this takes a little while!</p></div>`;
+  box.innerHTML = `<div class="paint-box painting-now" role="status"><span class="brush" aria-hidden="true">🖌️</span><p>That's the quick sketch. The Creature Artist is painting the real ${esc(ART_TIERS[artTierFor(c)].label.toLowerCase())} of ${esc(c.name)} now... 🎨 (about 10 seconds)</p></div>`;
   $(".card-art", root).classList.add("painting");
   $("#evolve", root).disabled = true;
   $("#new", root).disabled = true;
   sfx.click();
   try {
-    const image = await paint({ name: c.name, description: c.description, habitat: c.habitat, rarity: c.rarity });
+    const image = await paint({ name: c.name, description: c.description, habitat: c.habitat, rarity: c.rarity }).finally(() => (paintingId = null));
     logEvent("creature.paint", { name: c.name, tier: artTierFor(c), ok: true });
     if (current?.id !== c.id) return;
     saveCreature({ ...current, painting: image, paintedLevel: current.level, paintedTier: artTierFor(c), view: undefined });
@@ -274,6 +287,7 @@ async function evolve(addition) {
     const rarityBonus = Math.max(5, RARITY_GEMS[next.rarity] - RARITY_GEMS[c.rarity]);
     const result = award({ spells: r.spells, gems: rarityBonus, mode: "creature", text: addition });
     showCard();
+    autoPaint();
     confetti(50);
     await showReward({ cheer: `${c.name} EVOLVED to level ${next.level}! ${r.artistNote}`, spells: r.spells, result, mood: "wow" });
   } catch (e) {
