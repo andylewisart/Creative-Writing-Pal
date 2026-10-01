@@ -9,7 +9,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { GUIDE, TASKS, paintPrompt } from "./public/js/prompts.js";
+import { TASKS } from "./public/js/prompts.js";
+import { DEFAULTS, runClaudeTask, paintCreature } from "./public/js/engine.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -18,15 +19,20 @@ loadDotEnv(path.join(here, ".env"));
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
-const MODEL = process.env.STORY_QUEST_MODEL || "claude-opus-5-5";
+const MODEL = process.env.STORY_QUEST_MODEL || DEFAULTS.model;
 const live = Boolean(process.env.ANTHROPIC_API_KEY);
-const client = live ? new Anthropic() : null;
-let useFallbacks = true;
+const claude = { client: live ? new Anthropic() : null, Anthropic, model: MODEL, state: { useFallbacks: true } };
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI() : null;
-const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare";
-const IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "medium";
-const IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
+const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || DEFAULTS.imageModel;
+const IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || DEFAULTS.imageQuality;
+const painter = {
+  openai,
+  OpenAI,
+  model: IMAGE_MODEL,
+  quality: IMAGE_QUALITY,
+  size: process.env.OPENAI_IMAGE_SIZE || DEFAULTS.imageSize,
+};
 const PAINTS_PER_DAY = Number(process.env.PAINTS_PER_DAY) || 25;
 const paintCount = { day: "", n: 0 };
 
@@ -65,43 +71,6 @@ function readBody(req, limit = 200_000) {
   });
 }
 
-async function callClaude(task, payload) {
-  const t = TASKS[task];
-  const params = {
-    model: MODEL,
-    max_tokens: 16000,
-    system: [{ type: "text", text: GUIDE, cache_control: { type: "ephemeral" } }],
-    output_config: { effort: t.effort, format: { type: "json_schema", schema: t.schema } },
-    messages: [{ role: "user", content: t.build(payload) }],
-  };
-  let response;
-  if (useFallbacks) {
-    try {
-      // If a safety classifier declines, the API re-runs the request on a fallback model.
-      response = await client.beta.messages.create({
-        ...params,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      });
-    } catch (e) {
-      if (!(e instanceof Anthropic.BadRequestError)) throw e;
-      console.warn("Fallbacks not accepted for this account; continuing without them:", e.message);
-      useFallbacks = false;
-    }
-  }
-  if (!response) response = await client.messages.create(params);
-
-  if (response.stop_reason === "refusal") {
-    throw Object.assign(new Error("Claude declined this request"), { status: 422, code: "refused" });
-  }
-  const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw Object.assign(new Error(`Reply was not valid JSON (stop_reason: ${response.stop_reason})`), { status: 502 });
-  }
-}
-
 async function handleAI(req, res) {
   let task, payload;
   try {
@@ -116,16 +85,12 @@ async function handleAI(req, res) {
 
   const started = Date.now();
   try {
-    const result = await callClaude(task, payload);
+    const result = await runClaudeTask(claude, task, payload);
     console.log(`${task} ok in ${Date.now() - started}ms`);
     send(res, 200, result);
   } catch (e) {
-    let code = e.code || "default";
-    if (e instanceof Anthropic.RateLimitError) code = "rate_limited";
-    else if (e instanceof Anthropic.AuthenticationError) code = "not_granted";
-    else if (e instanceof Anthropic.APIConnectionError) code = "network";
     console.error(`${task} failed:`, e.message);
-    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code });
+    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code: e.code || "default" });
   }
 }
 
@@ -150,29 +115,13 @@ async function handlePaint(req, res) {
 
   const started = Date.now();
   try {
-    const result = await openai.images.generate({
-      model: IMAGE_MODEL,
-      prompt: paintPrompt(creature),
-      size: IMAGE_SIZE,
-      quality: IMAGE_QUALITY,
-      output_format: "jpeg",
-      output_compression: 85,
-      background: "opaque",
-      n: 1,
-    });
-    const b64 = result.data?.[0]?.b64_json;
-    if (!b64) throw Object.assign(new Error("No image in reply"), { status: 502 });
+    const b64 = await paintCreature(painter, creature);
     console.log(`paint ok in ${Date.now() - started}ms (${paintCount.n}/${PAINTS_PER_DAY} today)`);
     send(res, 200, { image: `data:image/jpeg;base64,${b64}` });
   } catch (e) {
     paintCount.n -= 1;
-    let code = "default";
-    if (e instanceof OpenAI.BadRequestError && /moderation|safety/i.test(String(e.code))) code = "refused";
-    else if (e instanceof OpenAI.RateLimitError) code = "rate_limited";
-    else if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) code = "not_granted";
-    else if (e instanceof OpenAI.APIConnectionError) code = "network";
     console.error("paint failed:", e.message);
-    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code });
+    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code: e.code || "default" });
   }
 }
 

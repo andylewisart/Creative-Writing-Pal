@@ -22,6 +22,8 @@ const result = await build({
   minify: true,
   target: "es2020",
   write: false,
+  // Browser-key mode (github.io) never runs inside claude.ai; keep the SDKs out.
+  plugins: [{ name: "skip-direct", setup: (b) => b.onResolve({ filter: /\/direct\.js$/ }, () => ({ path: "./direct.js", external: true })) }],
 });
 const js = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
 

@@ -44,7 +44,26 @@ The full prompt is in `public/js/prompts.js`. In short:
 
 Run `npm run build:artifact` and publish `dist/story-quest.html` as a claude.ai artifact with the `sample` capability. When you open the link while signed in to Claude, the game asks Claude through **your Claude account**, so no API key is needed. The first AI step asks you to allow it. Progress is saved in that browser.
 
-### Option B: run it yourself with an API key
+### Option B: on GitHub Pages (a github.io link that works on any device)
+
+The repo includes a workflow (`.github/workflows/pages.yml`) that builds a static copy of the game and publishes it to `https://<your-username>.github.io/Creative-Writing-Pal/` on every push.
+
+There's no server on GitHub Pages, so keys are entered on each device instead:
+
+1. Open the site, go to **Grown-ups corner → AI connection**, and paste your Anthropic key. The OpenAI key is optional and turns on painted creature art.
+2. Tap **Check keys** to confirm they work. Checking is free.
+
+The keys are saved only in that browser and are sent only to Anthropic and OpenAI. Visitors without keys get practice magic. Anyone using that device could find the keys in the browser's developer tools, so **set a monthly spending limit** in both accounts (console.anthropic.com and platform.openai.com). The page caps paintings at 25 per day per device.
+
+One-time GitHub setup:
+
+1. GitHub Pages needs a **public** repo unless you have GitHub Pro: Settings → General → Danger Zone → Change visibility. No keys are stored in the code.
+2. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+3. Actions → "Publish to GitHub Pages" → **Run workflow**, or push any change.
+
+To build the static copy locally: `npm run build:pages` (output in `site/`).
+
+### Option C: run it yourself with an API key
 
 You need Node.js 20 or newer and an Anthropic API key.
 
@@ -90,7 +109,7 @@ OPENAI_API_KEY=sk-proj-...
 | `OPENAI_IMAGE_SIZE` | `1024x1024` | |
 | `PAINTS_PER_DAY` | `25` | |
 
-### Option C: practice magic (no AI)
+### Option D: practice magic (no AI)
 
 With no API key and outside claude.ai, the game still works. It uses simple word patterns to spot spells, pre-written chapters, and a code-drawn creature. That's good for trying it out, but the real AI is much better at reacting to what your child actually wrote.
 
@@ -111,11 +130,16 @@ server.js                 Node server: serves the game, calls Claude (structured
 public/index.html         page shell
 public/css/style.css      all styles
 public/js/prompts.js      the AI guide, each task's prompt + JSON schema, reply cleanup
-public/js/ai.js           picks the backend: claude.ai artifact, server, or practice
+public/js/ai.js           picks the backend: claude.ai artifact, server, browser keys, or practice
+public/js/engine.js       the Claude and image-model calls (shared by server and github.io build)
+public/js/direct.js       github.io build: calls the APIs from the browser with saved keys
+public/js/keys.js         keys saved on this device (github.io build)
 public/js/demo.js         practice-mode magic + live spell lights
 public/js/state.js        saved progress (browser localStorage), gems, Sparky's levels
 public/js/modes/*.js      quest, epic, creature, library, grown-ups screens
-scripts/build-artifact.mjs  bundles everything into one HTML file
+scripts/build-artifact.mjs  bundles everything into one HTML file (claude.ai artifact)
+scripts/build-pages.mjs   builds the static github.io site into site/
+.github/workflows/pages.yml publishes site/ to GitHub Pages
 test/                     unit tests + server tests against a fake Claude API
 ```
 

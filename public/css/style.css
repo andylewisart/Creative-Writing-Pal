@@ -457,3 +457,8 @@ button { font: inherit; cursor: pointer; }
 .tier small { font-size: .68rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
 .tier.now { opacity: 1; border-color: var(--fire); background: color-mix(in srgb, var(--fire) 20%, var(--night)); }
 .tier-next { font-size: .95rem; color: var(--star); }
+.connect { display: grid; gap: 10px; }
+.connect label small { display: block; font-weight: 400; color: var(--muted); font-size: .82rem; }
+.key-state { font-size: .78rem; font-weight: 700; color: var(--muted); margin-left: 6px; }
+.key-state.ok { color: var(--leaf); }
+.card-wrap { scroll-margin-top: 72px; }

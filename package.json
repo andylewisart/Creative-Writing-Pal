@@ -10,7 +10,8 @@
   "scripts": {
     "start": "node server.js",
     "build:artifact": "node scripts/build-artifact.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:pages": "node scripts/build-pages.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

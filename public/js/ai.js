@@ -1,10 +1,12 @@
 // One door to the AI, three possible backends:
 //  1. "claude"  - running as a claude.ai artifact: asks Claude on the viewer's account.
 //  2. "server"  - running from server.js with an API key: POST /api/ai.
-//  3. "practice" - nothing connected: simple word-pattern magic (demo.js).
+//  3. "direct"  - github.io build with keys saved on this device: calls the APIs from the browser.
+//  4. "practice" - nothing connected: simple word-pattern magic (demo.js).
 
 import { NORMALIZE, TASKS, fullPrompt } from "./prompts.js";
 import { demoReply } from "./demo.js";
+import { IS_STATIC_SITE, getKeys } from "./keys.js";
 
 let backend = null; // { kind, sample? }
 let paintOn = false; // server has an image-model key
@@ -20,6 +22,11 @@ export function detectBackend() {
       } catch {
         /* fall through */
       }
+    }
+    if (IS_STATIC_SITE) {
+      const keys = getKeys();
+      paintOn = Boolean(keys.openai);
+      return (backend = { kind: keys.anthropic ? "direct" : "practice" });
     }
     try {
       const res = await fetch("api/status", { headers: { accept: "application/json" } });
@@ -38,6 +45,13 @@ export function detectBackend() {
 
 export const canPaint = () => paintOn;
 
+// Call after a grown-up saves or removes keys.
+export function resetBackend() {
+  backend = null;
+  detecting = null;
+  paintOn = false;
+}
+
 export function backendKind() {
   return backend?.kind || "detecting";
 }
@@ -50,6 +64,7 @@ export class AIError extends Error {
 }
 
 const KID_MESSAGES = {
+  bad_key: "Sparky's magic key isn't working. Ask a grown-up to check the Grown-ups corner!",
   paint_limit: "The Creature Artist has painted so much today that the paint ran out! Come back tomorrow.",
   not_granted: "Sparky needs a grown-up to say yes before the real magic works. Practice magic is on for now!",
   rate_limited: "Whew, Sparky is out of breath! Wait a minute, then try again.",
@@ -86,6 +101,13 @@ export async function ask(task, payload) {
         throw new AIError(code, e?.message || "sample failed");
       }
     }
+  } else if (backend.kind === "direct") {
+    const { directAsk } = await import("./direct.js");
+    try {
+      raw = await directAsk(task, payload);
+    } catch (e) {
+      throw new AIError(e.code === "not_granted" ? "bad_key" : e.code || "default", e.message);
+    }
   } else {
     let res;
     try {
@@ -109,6 +131,14 @@ export async function ask(task, payload) {
 // Ask the server's image model to paint a creature. Resolves to a small
 // data: URL (shrunk in the browser so lots of cards fit in saved progress).
 export async function paint(creature) {
+  if (IS_STATIC_SITE) {
+    const { directPaint } = await import("./direct.js");
+    try {
+      return shrink(await directPaint(creature), 512);
+    } catch (e) {
+      throw new AIError(e.code === "not_granted" ? "bad_key" : e.code || "default", e.message);
+    }
+  }
   let res;
   try {
     res = await fetch("api/paint", {

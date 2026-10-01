@@ -2,7 +2,8 @@
 
 import { get, update, resetAll } from "../state.js";
 import { SPELLS } from "../spells.js";
-import { detectBackend, backendKind } from "../ai.js";
+import { detectBackend, backendKind, resetBackend } from "../ai.js";
+import { IS_STATIC_SITE, getKeys, setKeys, maskKey } from "../keys.js";
 import { esc, el, $ } from "../ui.js";
 
 let root, nav;
@@ -90,6 +91,7 @@ async function dashboard() {
 
       <h2>AI connection</h2>
       <p class="p-note" id="ai-status">Checking...</p>
+      ${IS_STATIC_SITE ? connectHtml() : ""}
 
       <h2>How the game teaches</h2>
       <div class="p-how">
@@ -130,13 +132,74 @@ async function dashboard() {
     $("#reset-no", root).addEventListener("click", dashboard);
   });
 
+  if (IS_STATIC_SITE) wireConnect();
   await detectBackend();
   const status = $("#ai-status", root);
   if (!status) return;
   status.textContent = {
+    direct: "Connected with the API keys saved on this device. Stories and judging use your Anthropic key; painted creature art uses your OpenAI key.",
     claude: "Connected through your Claude account. Each AI step uses your Claude usage. The first time, Claude asks you to allow this page to use it.",
     server: "Connected through the Story Quest server and your Anthropic API key.",
-    practice:
-      "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. To turn on real AI, open the game as a Claude artifact, or run the server with an Anthropic API key (see the README).",
+    practice: IS_STATIC_SITE
+      ? "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. Add an Anthropic API key below to turn on real AI on this device."
+      : "Not connected. The game is using practice magic: simple word-pattern checks and pre-written story chapters. To turn on real AI, open the game as a Claude artifact, or run the server with an Anthropic API key (see the README).",
   }[backendKind()];
+}
+
+function connectHtml() {
+  const k = getKeys();
+  const state = (v) => (v ? `<span class="key-state ok">saved ${esc(maskKey(v))}</span>` : `<span class="key-state">not set</span>`);
+  return `<div class="connect">
+    <p class="p-note">Keys are saved only in this browser on this device, and are sent only to Anthropic and OpenAI. Anyone using this device could dig them out of the browser's developer tools, so set a monthly spending limit on both accounts.</p>
+    <div class="p-settings">
+      <label for="key-anthropic">Anthropic API key ${state(k.anthropic)}<small>Stories, Sparky, and judging. Get one at console.anthropic.com</small></label>
+      <input id="key-anthropic" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+      <label for="key-openai">OpenAI API key ${state(k.openai)}<small>Optional: painted creature art. Get one at platform.openai.com</small></label>
+      <input id="key-openai" type="password" autocomplete="off" spellcheck="false" placeholder="sk-proj-...">
+    </div>
+    <div class="danger-zone">
+      <button class="btn btn-small btn-go" type="button" id="save-keys">Save keys</button>
+      <button class="btn btn-small btn-ghost" type="button" id="check-keys">Check keys</button>
+      ${k.anthropic || k.openai ? `<button class="btn btn-small btn-danger" type="button" id="forget-keys">Remove keys from this device</button>` : ""}
+    </div>
+    <p class="p-note" id="key-note" role="status"></p>
+  </div>`;
+}
+
+function wireConnect() {
+  // Look the note up each time: saving redraws the page.
+  const say = (text) => {
+    const n = $("#key-note", root);
+    if (n) n.textContent = text;
+  };
+  const check = async () => {
+    say("Checking keys...");
+    const { checkKeys } = await import("../direct.js");
+    const r = await checkKeys();
+    const word = { ok: "works ✅", bad: "was rejected ❌ (check for typos, or make a new key)", unreachable: "couldn't be reached (check the internet)", none: "not set" };
+    say(`Anthropic key ${word[r.anthropic]}. OpenAI key ${word[r.openai]}.`);
+  };
+  $("#save-keys", root).addEventListener("click", async () => {
+    const k = getKeys();
+    const a = $("#key-anthropic", root).value.trim();
+    const o = $("#key-openai", root).value.trim();
+    if (!a && !o) {
+      say("Paste a key first.");
+      return;
+    }
+    if (!setKeys({ anthropic: a || k.anthropic, openai: o || k.openai })) {
+      say("This browser won't let the page save anything (private browsing?). Try a regular window.");
+      return;
+    }
+    resetBackend();
+    await dashboard();
+    await check();
+  });
+  $("#check-keys", root).addEventListener("click", check);
+  $("#forget-keys", root)?.addEventListener("click", async () => {
+    setKeys({});
+    resetBackend();
+    await dashboard();
+    $("#key-note", root).textContent = "Keys removed from this device.";
+  });
 }
