@@ -304,7 +304,7 @@ Return:
 - spells: the spells in their writing (for an upgrade, only the newly added words).
 - artistNote: Sparky's comment (1-2 sentences) naming a detail that made the drawing better, plus one thing the artist had to guess.
 - upgradeQuestion: ONE curious question about a detail the artist could not draw yet. If the creature is basically a copy of a famous movie, TV, or game character, celebrate the idea and make this question invite a twist that makes it one-of-a-kind (the painter can't paint copies of famous characters).
-- svg: the drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; bold, cool cartoon style (fierce is fine, never babyish) with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
+- svg: ${p.sketchOnlyIfCommon ? "ONLY when you rate the rarity common, draw the quick sketch; for rare, epic, or legendary return an empty string, because a painter will paint it instead. When you do draw it, the" : "the"} drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; bold, cool cartoon style (fierce is fine, never babyish) with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
     schema: obj({
       name: str("creature name"),
       species: str("kind of creature"),

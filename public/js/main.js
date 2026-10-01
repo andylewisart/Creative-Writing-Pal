@@ -3,6 +3,7 @@ import { detectBackend, backendKind } from "./ai.js";
 import { esc, el, $, sparkyHtml } from "./ui.js";
 import { sfx } from "./fx.js";
 import { logEvent } from "./log.js";
+import { stopVoice } from "./voice.js";
 import * as quest from "./modes/quest.js";
 import * as epic from "./modes/epic.js";
 import * as creature from "./modes/creature.js";
@@ -16,6 +17,7 @@ const SCREENS = { hub, quest: quest.render, epic: epic.render, creature: creatur
 
 export function go(name, params = {}) {
   window.speechSynthesis?.cancel();
+  stopVoice("left");
   logEvent("screen", { name, tab: params.tab });
   app.innerHTML = "";
   app.dataset.screen = name;

@@ -40,10 +40,11 @@ export function challengeHtml(c, label = "Bonus quest") {
   </div>`;
 }
 
-export function loadingHtml(text) {
+export function loadingHtml(text, sub = "") {
   return `<div class="brewing" role="status">
     <div class="cauldron" aria-hidden="true"><span>✨</span><span>🔮</span><span>⭐</span></div>
-    <p>${esc(text)}</p>
+    <p class="brew-main">${esc(text)}</p>
+    ${sub ? `<p class="brew-sub">${esc(sub)}</p>` : ""}
   </div>`;
 }
 

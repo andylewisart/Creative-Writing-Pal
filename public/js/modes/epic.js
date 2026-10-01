@@ -33,7 +33,7 @@ function draw(text = "") {
       <div class="boring-machine">
         <div class="machine-label">BORING-O-TRON 3000 <span aria-hidden="true">🥱</span></div>
         <p class="boring-sentence">${esc(round.boring)}</p>
-        <p class="machine-hint">Yawn. Rewrite this sentence to make it EPIC. Add colors, sounds, feelings, power words, surprises!</p>
+        <p class="machine-hint">Yawn. Make it EPIC.</p>
       </div>
       <div id="meter-zone">${meterHtml(lastTry?.score || 0, round.best)}</div>
       <div id="result-zone"></div>
@@ -41,7 +41,7 @@ function draw(text = "") {
         ${writingDesk({ id: "epic-text", placeholder: "Make it EPIC...", rows: 3, goal: 20, value: text })}
         <p class="form-error" id="epic-error" role="alert" hidden></p>
         <div class="turn-actions">
-          <button class="btn btn-ghost" type="button" id="new-boring">🎲 New boring sentence</button>
+          <button class="btn btn-ghost" type="button" id="new-boring">🎲 New one</button>
           <button class="btn btn-go" type="button" id="zap">⚡ EPIC-IFY!</button>
         </div>
       </div>

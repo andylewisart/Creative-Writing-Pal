@@ -31,7 +31,13 @@ function usedToday(addSecs = 0) {
 const minutesAllowed = () => get().settings.voiceMinutes ?? 20;
 const voiceEnabled = () => get().settings.voice !== false;
 
-export const talkButtonHtml = () => `<button class="btn btn-ghost btn-talk" type="button" data-talk hidden>🎙️ Talk it out with Sparky</button>`;
+// Only one session at a time; anything that leaves the page can end it.
+let activeStop = null;
+export function stopVoice(reason = "left") {
+  activeStop?.(reason);
+}
+
+export const talkButtonHtml = () => `<button class="btn btn-ghost btn-talk" type="button" data-talk hidden>🎙️ Talk it out</button>`;
 
 // Show the talk button once we know the voice coach is available, and open
 // the coach panel just above `anchorSel` when it's tapped.
@@ -70,10 +76,23 @@ export function openVoiceCoach(anchor, ctx, onEnd = () => {}) {
   const notes = $(".voice-notes", panel);
   const sparky = $(".sparky", panel);
   let pc = null, dc = null, stream = null, audio = null, timer = null, started = 0, ended = false;
+  stopVoice("replaced");
+
+  // Hang up as soon as the panel leaves the page (the child submitted,
+  // switched screens, or the page redrew) or the app goes to the background.
+  const watcher = new MutationObserver(() => {
+    if (!panel.isConnected) stop("left");
+  });
+  watcher.observe(document.body, { childList: true, subtree: true });
+  const onHide = () => document.visibilityState === "hidden" && stop("hidden");
+  document.addEventListener("visibilitychange", onHide);
 
   const stop = (reason) => {
     if (ended) return;
     ended = true;
+    if (activeStop === stop) activeStop = null;
+    watcher.disconnect();
+    document.removeEventListener("visibilitychange", onHide);
     clearInterval(timer);
     try { dc?.close(); } catch { /* already closed */ }
     try { pc?.close(); } catch { /* already closed */ }
@@ -111,6 +130,7 @@ export function openVoiceCoach(anchor, ctx, onEnd = () => {}) {
     stop("error");
   };
 
+  activeStop = stop;
   $("[data-voice-done]", panel).onclick = () => stop("done");
 
   const handle = (evt) => {

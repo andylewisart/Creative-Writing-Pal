@@ -188,14 +188,14 @@ function writeTurn(draftText = "") {
           <span class="turn-count">${last ? "🏁 Final part!" : `Your part ${q.turn} of ${q.totalTurns}`}</span>
           <h2>${last ? `How does ${esc(q.hero.name)}'s adventure end?` : `What does ${esc(q.hero.name)} do next?`}</h2>
         </div>
-        ${challengeHtml(q.bonus, "Bonus quest (+15 💎)")}
+        ${challengeHtml(q.bonus, "Bonus +15 💎")}
         ${writingDesk({ id: "kid-text", placeholder: last ? "Write the big ending..." : `${q.hero.name}...`, value: draftText })}
         <div class="spark-box" id="spark-box" hidden></div>
         <p class="form-error" id="turn-error" role="alert" hidden></p>
         <div class="turn-actions">
           ${talkButtonHtml()}
           <button class="btn btn-ghost" type="button" id="spark">🔮 Idea crystal</button>
-          <button class="btn btn-go" type="button" id="cast">✨ Feed Sparky my words!</button>
+          <button class="btn btn-go" type="button" id="cast">✨ Feed Sparky</button>
         </div>
         <div class="quest-tools">
           <button class="link-btn" type="button" id="quit">Start a different story</button>
@@ -303,24 +303,23 @@ function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
       <div class="turn-panel powerup" id="turn-panel">
         <div class="powerup-head">
           ${sparkyHtml(coach ? "happy" : "wow", "small bounce")}
-          <div><span class="turn-count">⚡ Power-up! Make one sentence stronger (+15 💎)</span>
+          <div><span class="turn-count">⚡ Power-up · +15 💎</span>
           <h2>${esc(coach ? coach.cheer : powerUp.prompt)}</h2></div>
         </div>
         ${
           coach?.frame
-            ? `<div class="frame-help"><span class="label">Fill in the blanks with your own words:</span><p class="frame">${esc(coach.frame).replace(/_{3,}/g, '<span class="blank">___</span>')}</p></div>`
+            ? `<div class="frame-help"><span class="label">Fill in the blanks:</span><p class="frame">${esc(coach.frame).replace(/_{3,}/g, '<span class="blank">___</span>')}</p></div>`
             : `<div class="how-to" style="--spell:${spell.color}">
-                <span class="challenge-label">${spell.icon} How the ${esc(spell.name)} works</span>
+                <span class="challenge-label">${spell.icon} ${esc(spell.name)}: put the new words inside</span>
                 <p class="demo-line"><span class="demo-before">${esc(spell.demo.before)}</span><span class="demo-arrow" aria-hidden="true">→</span><span class="demo-after">${spell.demo.after}</span></p>
-                <p class="demo-tip">See? The new words go <b>inside</b> the sentence.</p>
               </div>`
         }
-        <label class="label" for="revision">✏️ Change your sentence${coach?.frame ? " (replace the ___ blanks)" : ""}:</label>
+        <label class="sr-only" for="revision">Your sentence</label>
         ${writingDesk({ id: "revision", placeholder: target, rows: 2, goal: countWords(target) + 4, value: startText })}
         <p class="form-error" id="turn-error" role="alert" hidden></p>
         <div class="turn-actions">
           ${talkButtonHtml()}
-          <button class="btn btn-ghost" type="button" id="skip">Skip, keep going →</button>
+          <button class="btn btn-ghost" type="button" id="skip">Skip</button>
           <button class="btn btn-go" type="button" id="power">⚡ Power up!</button>
         </div>
       </div>

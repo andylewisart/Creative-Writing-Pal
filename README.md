@@ -110,17 +110,18 @@ Without a key the game still works. It uses simple word patterns to spot spells,
 
 ## Painted creature art
 
-The Creature Lab's **🎨 Paint it!** button turns the artist's quick sketch into real artwork on the trading card. **The art gets cooler as the writing gets more detailed.** The card's rarity, which the AI judges from the description, picks the style:
+**The art gets cooler as the writing gets more detailed.** The card's rarity, which the AI judges from the description, picks what the child gets:
 
 | Rarity | Art style |
 |---|---|
-| Common (bare-bones, or under 12 words) | ✏️ rough pencil sketch, no color |
+| Common (bare-bones, or under 12 words) | 📐 only the AI's plain vector sketch, no painting, with a nudge to add details |
 | Rare | 🖌️ movie concept art: realistic textures, dramatic light |
 | Epic | 🎬 blockbuster monster-movie shot: huge scale, low camera angle, atmosphere |
 | Legendary | 🏆 the most epic cinematic reveal |
 
-- The painting prompt uses only the child's own words: anything they didn't describe stays plain ("it is a monster" gets a simple gray blob).
-- You get one painting per creature level. Evolving a creature lets you paint the new version, and older paintings can still be viewed.
+- Rare and better go **straight to painting**: no sketch first. The creature's picture is shown large, with its name and rarity on top.
+- The painting prompt uses only the child's own words: anything they didn't describe stays plain.
+- Each creature level gets one painting. Evolving a creature (adding details) paints the new version, and the earlier sketch stays viewable.
 - Paintings are shrunk to about 50 KB before saving. If storage fills up, the oldest paintings are dropped first; gems and books are never lost.
 - OpenAI won't paint lookalikes of famous characters. A creature with dark scales and glowing blue back spikes gets blocked for looking like Godzilla. When that happens, Sparky explains that real creature designers make theirs one-of-a-kind and suggests a Twist Spell, and the sketch stays. The AI's evolve question also nudges toward originality when a creature is a copy.
 
