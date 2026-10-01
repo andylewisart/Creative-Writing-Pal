@@ -61,6 +61,7 @@ async function dashboard() {
     el(`<section class="parents">
       <h1 class="screen-title">Grown-ups corner</h1>
 
+      <div class="p-panel">
       <div class="p-grid">
         <div class="p-stat"><b>${totalWords}</b><span>words written</span></div>
         <div class="p-stat"><b>${s.stories.length}</b><span>stories finished</span></div>
@@ -77,14 +78,18 @@ async function dashboard() {
           : `<p class="p-note">Nothing written yet. Bars appear here as your child writes.</p>`
       }
 
-      <h2>Recent activity</h2>
-      ${activityHtml()}
-
       <h2>Writing moves used (spells)</h2>
       <div class="p-spells">${SPELLS.map(
         (sp) => `<div class="p-spell"><span>${sp.icon} ${esc(sp.name)}</span><div class="p-bar"><div style="width:${((s.spellCounts[sp.id] || 0) / maxSpell) * 100}%;background:${sp.color}"></div></div><b>${s.spellCounts[sp.id] || 0}</b><small>${esc(sp.teaches)}</small></div>`,
       ).join("")}</div>
+      </div>
 
+      <div class="p-panel">
+      <h2>Recent activity</h2>
+      ${activityHtml()}
+      </div>
+
+      <div class="p-panel">
       <h2>Settings</h2>
       <div class="p-settings">
         <label for="set-name">Writer name</label><input id="set-name" value="${esc(s.writerName)}" maxlength="24">
@@ -109,7 +114,8 @@ async function dashboard() {
       <p class="p-note" id="voice-note" role="status"></p>
       <p class="p-note">Version: ${typeof __BUILD__ !== "undefined" ? esc(__BUILD__) : "local"}</p>
 
-      <h2>How the game teaches</h2>
+      <details class="p-how-box">
+      <summary><h2>How the game teaches</h2></summary>
       <div class="p-how">
         <p><b>Detail earns power.</b> Every mode rewards the same eight craft moves ("spells"): sensory detail, sound words, dialogue, feelings, comparisons, strong verbs, and twists. Gems, Sparky's growth, and creature stats all come from using them.</p>
         <p><b>Revision is a power-up, not a correction.</b> After each story turn, Sparky picks one sentence your child wrote and asks one curious question about it. They edit that sentence in place, guided by a quick before-and-after example. If they tack the detail on the end ("…from the ground. Red fire."), Sparky celebrates the detail and offers a fill-in-the-blank frame built from their own sentence, so they learn where details go.</p>
@@ -117,10 +123,12 @@ async function dashboard() {
         <p><b>No red pen.</b> The AI never mentions spelling or grammar and never writes your child's part for them. Praise always quotes their actual words. The "Idea crystal" gives questions, not sentences to copy.</p>
         <p><b>Ways to help:</b> read the finished books together and ask about the favorite line. Try Creature Lab side by side: one of you writes a short description, the other a detailed one, and compare the drawings.</p>
       </div>
+      </details>
 
       <h2>Start over</h2>
       <div class="danger-zone" id="danger">
         <button class="btn btn-small btn-danger" type="button" id="reset">Erase all progress</button>
+      </div>
       </div>
     </section>`),
   );

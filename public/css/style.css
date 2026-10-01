@@ -197,12 +197,12 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------- Reward overlay ---------- */
 .overlay {
-  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+  position: fixed; inset: 0; z-index: 50; display: grid; padding: 16px;
   background: color-mix(in srgb, var(--night) 80%, transparent); backdrop-filter: blur(4px);
   overflow-y: auto;
 }
 .reward-card {
-  width: min(520px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center;
+  margin: auto; width: min(520px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center;
   background: var(--night-2); border: 3px solid var(--star); border-radius: 26px; padding: 22px 18px;
   box-shadow: 0 0 60px color-mix(in srgb, var(--star) 35%, transparent);
 }
@@ -441,6 +441,13 @@ button { font: inherit; cursor: pointer; }
 .p-spell b { text-align: right; font-variant-numeric: tabular-nums; }
 .p-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; align-items: center; max-width: 620px; }
 .p-settings input[type=checkbox] { width: 24px; height: 24px; accent-color: var(--fire); }
+.p-panel { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.p-how-box summary { cursor: pointer; list-style: none; }
+.p-how-box summary::-webkit-details-marker { display: none; }
+.p-how-box summary h2 { display: inline; }
+.p-how-box summary h2::after { content: " ▸"; color: var(--muted); }
+.p-how-box[open] summary h2::after { content: " ▾"; }
+.p-how-box .p-how { margin-top: 10px; }
 .p-how { display: grid; gap: 8px; max-width: 70ch; }
 .p-how p { margin: 0; }
 .danger-zone { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -577,3 +584,76 @@ button { font: inherit; cursor: pointer; }
 .page-ai.power-blaze .chapter-power { background: #ffcf8a; color: #6b2a12; }
 .page-ai.power-tiny .chapter-power { background: #e6e1d6; color: #8a8478; }
 .page-ai.power-tiny p { color: #7b6f60; }
+
+/* ---------- Wide screens (a desktop or laptop monitor) ----------
+   Everything fits in one screen: no page scrolling. The side-by-side
+   layouts use the width, and the story book scrolls inside itself. */
+.setup-col { display: grid; gap: 16px; align-content: start; }
+@media (min-width: 1100px) and (min-height: 650px) {
+  :root { --app-h: calc(100dvh - 86px); }
+  .app { max-width: 1560px; padding-block: 12px 14px; }
+
+  /* Story Quest: the book on the left, the writing panel on the right. */
+  .quest { grid-template-columns: minmax(0, 1.15fr) minmax(460px, 1fr); align-items: start; height: var(--app-h); }
+  .quest > .storybook { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding-block: 18px; box-shadow: inset 10px 0 0 #e2c993; border-bottom: 6px solid var(--parchment-edge); }
+  .quest > .turn-panel { max-height: 100%; overflow-y: auto; }
+  .quest .kid-writing { min-height: 0; }
+
+  /* New quest: worlds beside the hero form. */
+  .quest-setup { grid-template-columns: minmax(0, 1.35fr) minmax(380px, 1fr); gap: 12px 36px; align-items: start; max-width: 1400px; margin: 0 auto; }
+  .quest-setup > .screen-title { grid-column: 1 / -1; }
+  .quest-setup .step { margin-top: 0; }
+  .quest-setup .world-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .quest-setup .world-card { padding: 10px 12px; }
+  .quest-setup .world-icon { font-size: 1.8rem; }
+  .quest-setup .world-name { font-size: 1.05rem; }
+  .quest-setup .world-blurb { font-size: .82rem; }
+  .quest-setup input { max-width: none; }
+
+  /* Creature Lab result: the art beside the evolve panel. */
+  .lab-result { max-width: 1400px; grid-template-columns: auto minmax(380px, 1fr); grid-template-rows: auto auto 1fr; gap: 14px 32px; align-items: start; height: var(--app-h); }
+  .lab-result > .card-wrap { grid-row: 1 / -1; width: min(calc(var(--app-h) - 175px), 56vw); }
+  .lab-result .creature-hero { gap: 10px; }
+  .lab-result .hero-abilities { max-height: 76px; overflow-y: auto; }
+  .lab-result > .evolve { overflow-y: auto; max-height: 100%; }
+
+  /* Boring-to-EPIC, once there's a result: machine and desk left, result right. */
+  .epic:has(.epic-result) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "title title" "machine result" "meter result" "desk result"; align-items: start; gap: 14px 32px; max-width: 1400px; margin: 0 auto; }
+  .epic:has(.epic-result) > .screen-title { grid-area: title; }
+  .epic:has(.epic-result) > .boring-machine { grid-area: machine; }
+  .epic:has(.epic-result) > #meter-zone { grid-area: meter; }
+  .epic:has(.epic-result) > #result-zone { grid-area: result; }
+  .epic:has(.epic-result) > .epic-desk { grid-area: desk; }
+  .epic { max-width: 900px; margin: 0 auto; }
+}
+@media (min-width: 1100px) and (min-height: 650px) {
+  .reward-card { width: min(680px, 100%); }
+  .spellbook { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* Shorter wide screens (1080p at 125% scaling, laptops): tighten up. */
+@media (min-width: 1100px) and (min-height: 650px) and (max-height: 820px) {
+  .screen-title { font-size: 2rem; }
+  .quest-setup, .setup-col, .lab, .epic { gap: 8px; }
+  .quest-setup { column-gap: 28px; }
+  .quest-setup .world-card { padding: 7px 10px; }
+  .quest-setup .world-icon { font-size: 1.4rem; }
+  .quest-setup .chip { padding: 5px 12px; }
+  .quest-setup input, .lab input#creature-name { padding-block: 8px; }
+  .quest-setup .btn-big { padding-block: 12px; }
+  .hero-form { gap: 6px; }
+  .reward-card { gap: 8px; padding: 14px 18px; }
+  .reward-card .sparky.big { width: 84px; }
+  .spell-page { padding: 10px 12px; }
+  .spell-big { font-size: 1.8rem; }
+}
+@media (min-width: 1100px) and (min-height: 650px) {
+  /* Grown-ups corner: three panels side by side, each scrolling inside. */
+  .parents { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: 12px 18px; height: var(--app-h); }
+  .parents > .screen-title { grid-column: 1 / -1; }
+  .parents > .p-panel { height: 100%; overflow-y: auto; overscroll-behavior: contain; background: color-mix(in srgb, var(--slate) 45%, transparent); border-radius: 18px; padding: 4px 16px 16px; }
+  .parents .p-settings { grid-template-columns: minmax(0, 1fr) auto; }
+
+  /* Reading a finished book: the book scrolls, the buttons stay put. */
+  .reader { grid-template-rows: auto minmax(0, 1fr) auto; height: var(--app-h); max-width: 1100px; margin: 0 auto; gap: 10px; justify-items: start; }
+  .reader > .storybook { width: 100%; height: 100%; overflow-y: auto; overscroll-behavior: contain; box-shadow: inset 10px 0 0 #e2c993; }
+}

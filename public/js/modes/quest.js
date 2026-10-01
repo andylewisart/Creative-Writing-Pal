@@ -37,6 +37,7 @@ function setup() {
   root.appendChild(
     el(`<section class="quest-setup">
       <h1 class="screen-title">New Story Quest</h1>
+      <div class="setup-col">
       <h2 class="step">1. Pick a world</h2>
       <div class="world-grid">
         ${WORLDS.map(
@@ -52,7 +53,9 @@ function setup() {
           <span class="world-blurb">Sparky picks a world at random</span>
         </button>
       </div>
+      </div>
 
+      <div class="setup-col">
       <h2 class="step">2. Make your hero</h2>
       <div class="hero-form">
         <label for="hero-name">Hero's name</label>
@@ -67,6 +70,7 @@ function setup() {
       </div>
       <p class="setup-error" id="setup-error" role="alert" hidden></p>
       <button class="btn btn-go btn-big" type="button" id="begin">Begin the adventure! 🗺️</button>
+      </div>
     </section>`),
   );
 
