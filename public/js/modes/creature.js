@@ -5,9 +5,10 @@ import { get, update, award, countWords } from "../state.js";
 import { ask, kidMessage, canPaint, paint, detectBackend } from "../ai.js";
 import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward } from "../ui.js";
 import { sfx, confetti } from "../fx.js";
-import { ART_TIERS, artTierFor, nextArtTier } from "../prompts.js";
+import { ART_TIERS, artTierFor } from "../prompts.js";
 import { demoCreatureSvg } from "../demo.js";
 import { logEvent } from "../log.js";
+import { starsHtml, wireStars, nextUnlock, countStars, rarityFromStars, PRIZE } from "../details.js";
 import { talkButtonHtml, wireTalk } from "../voice.js";
 
 let root, nav;
@@ -22,14 +23,15 @@ const LOOKALIKE_TIP =
 const RARITY_GEMS = { common: 5, rare: 15, epic: 30, legendary: 50 };
 const ELEMENT_ICON = { fire: "🔥", water: "💧", earth: "🪨", air: "🌪️", lightning: "⚡", ice: "❄️", nature: "🌿", shadow: "🌑", light: "🌟", cosmic: "🌌", metal: "⚙️" };
 
-const BLUEPRINT = [
-  ["🫧", "Body"],
-  ["🎨", "Colors"],
-  ["🦴", "Wings, horns, tails"],
-  ["✨", "Powers"],
-  ["💥", "Sounds"],
-  ["🏔️", "Home"],
-];
+// One plain line about the next unlock, written for a third grader.
+function starMessage(n, painting) {
+  const next = nextUnlock(n);
+  if (!next) return "🏆 All 6 stars! LEGENDARY!";
+  if (!painting) return `⭐ ${n} of 6 stars. More stars make a stronger creature!`;
+  const more = `${next.need} more ⭐ ${next.need === 1 ? "unlocks" : "unlock"} ${next.icon} ${next.label}!`;
+  const have = rarityFromStars(n);
+  return have === "common" ? more : `${PRIZE[have]} unlocked! ${more}`;
+}
 
 export function render(r, n) {
   root = r;
@@ -63,6 +65,11 @@ function heroHtml(c) {
   return `<article class="creature-hero rarity-${esc(c.rarity)}">
     <div class="hero-art">
       ${artHtml(c)}
+      ${
+        !showsPainting(c) && canPaint()
+          ? `<div class="sketch-banner"><b>📐 Just a sketch</b><span>${esc(starMessage(countStars(c.details), true))}</span></div>`
+          : ""
+      }
       <div class="hero-tags"><span class="hero-rarity">${esc(c.rarity)}</span><span>Lv ${c.level}</span>${tier ? `<span>${tier.icon} ${esc(tier.label)}</span>` : `<span>📐 Sketch</span>`}</div>
       <div class="hero-name"><h1>${esc(c.name)}</h1><span>${ELEMENT_ICON[c.element] || "✨"} ${esc(c.species)}</span></div>
     </div>
@@ -94,7 +101,10 @@ function designer() {
         <h1 class="screen-title">Creature Lab</h1>
         <p class="lab-sub">The artist draws <b>only</b> what you write.</p>
       </header>
-      <ul class="blueprint" aria-label="Tell the artist about">${BLUEPRINT.map(([i, a]) => `<li><span aria-hidden="true">${i}</span>${a}</li>`).join("")}</ul>
+      <div class="star-goal">
+        ${starsHtml({}, { live: true })}
+        <p class="star-msg" id="star-msg" aria-live="polite"></p>
+      </div>
       <label for="creature-name" class="sr-only">Creature name (optional)</label>
       <input id="creature-name" maxlength="40" autocomplete="off" placeholder="Name (optional)">
       ${writingDesk({ id: "creature-desc", placeholder: "My creature is...", rows: 6, goal: 40 })}
@@ -106,11 +116,16 @@ function designer() {
     </section>`),
   );
   const ta = wireDesk($(".desk", root));
+  const msg = $("#star-msg", root);
+  let stars = 0;
+  const say = () => (msg.textContent = starMessage(stars, canPaint()));
+  wireStars($(".star-goal", root), ta, { onCount: (n) => ((stars = n), say()) });
+  detectBackend().then(say);
   $("#draw", root).addEventListener("click", () => create(ta.value.trim(), $("#creature-name", root).value.trim()));
   wireTalk(root, ".desk", () => ({
     kind: "creature",
     writerName: get().writerName,
-    where: "Creature Lab: describing a made-up creature so the Creature Artist can draw it. The artist draws ONLY what they describe, so details make it awesome.",
+    where: "Creature Lab: describing a made-up creature so the Creature Artist can draw it. The artist draws ONLY what they describe. Details about its body, colors, parts, powers, sounds, and home each earn a star.",
     draft: ta.value.trim(),
     question: "What does your creature look like, sound like, and what can it do?",
   }));
@@ -183,19 +198,34 @@ function showCard() {
       <div class="artist-line">${sparkyHtml("happy", "mini")}<span>${esc(c.artistNote)}</span></div>
       <div id="paint-box"></div>
       <div class="evolve">
-        <h2><span aria-hidden="true">🧬</span> ${esc(c.upgradeQuestion)}</h2>
-        ${writingDesk({ id: "evolve-text", placeholder: `Tell the artist more about ${c.name}...`, rows: 3, goal: 15 })}
+        <h2>✏️ Make ${esc(c.name)} better</h2>
+        <div class="star-goal">
+          ${starsHtml(c.details, { live: true })}
+          <p class="star-msg" id="star-msg" aria-live="polite"></p>
+        </div>
+        <p class="evolve-hint">💡 ${esc(c.upgradeQuestion)}</p>
+        <label class="sr-only" for="evolve-text">Your description</label>
+        ${writingDesk({ id: "evolve-text", placeholder: "My creature is...", rows: 5, goal: 40, value: c.description })}
         <p class="form-error" id="lab-error" role="alert" hidden></p>
         <div class="turn-actions">
           ${talkButtonHtml()}
           <button class="btn btn-ghost" type="button" id="new">🥚 New creature</button>
           <button class="btn btn-go" type="button" id="evolve">🧬 Evolve</button>
         </div>
-        <details class="desc-so-far"><summary>What you wrote</summary><p>${esc(c.description)}</p></details>
       </div>
     </section>`),
   );
   const ta = wireDesk($(".desk", root));
+  const msg = $("#star-msg", root);
+  const earned = countStars(c.details);
+  wireStars($(".evolve .star-goal", root), ta, {
+    base: c.details,
+    original: c.description,
+    onCount: (n) => {
+      const goesUp = rarityFromStars(n) !== rarityFromStars(earned);
+      msg.textContent = canPaint() && goesUp ? `⭐ ${n} stars! Tap Evolve to unlock ${PRIZE[rarityFromStars(n)]}!` : starMessage(n, canPaint());
+    },
+  });
   $("#new", root).addEventListener("click", () => {
     current = null;
     designer();
@@ -204,7 +234,7 @@ function showCard() {
   wireTalk(root, ".evolve .desk", () => ({
     kind: "creature-evolve",
     writerName: get().writerName,
-    where: `Creature Lab: adding details to their creature ${c.name} so it evolves. What they wrote so far: "${c.description}".`,
+    where: `Creature Lab: improving the description of their creature ${c.name} so it evolves. What they wrote before: "${c.description}".`,
     draft: ta.value.trim(),
     question: c.upgradeQuestion,
   }));
@@ -219,32 +249,22 @@ function saveCreature(next) {
   current = next;
 }
 
-// A slim art-ladder track with one short hint (only when painting is available).
+// Only shows up when a painting failed (with a retry) or when there is both
+// a sketch and a painting to flip between.
 function paintBox(c) {
   const box = $("#paint-box", root);
-  if (!box || current !== c || !canPaint() || paintingId === c.id) return;
-  const tierId = artTierFor(c);
-  const nextId = nextArtTier(tierId);
-  const order = Object.keys(ART_TIERS);
-  const label = (id) => (id === "common" ? "Sketch" : ART_TIERS[id].label.replace(" poster", ""));
-  const icon = (id) => (id === "common" ? "📐" : ART_TIERS[id].icon);
-  const track = `<ol class="ladder" aria-label="Art unlocked">${order
-    .map((id, i) => `<li class="${i < order.indexOf(tierId) ? "done" : id === tierId ? "now" : ""}"><span aria-hidden="true">${icon(id)}</span>${esc(label(id))}</li>`)
-    .join("")}</ol>`;
-  const failed = c.paintError && !(c.painting && c.paintedLevel === c.level);
-  let hint;
-  if (failed) {
-    hint = `<p class="ladder-hint warn">${esc(c.paintError === "refused" ? LOOKALIKE_TIP : kidMessage({ code: c.paintError }))}</p>
-      ${c.paintError === "paint_limit" || c.paintError === "refused" ? "" : `<button class="btn btn-paint btn-small" type="button" id="paint">🎨 Try painting again</button>`}`;
-  } else if (tierId === "common") {
-    hint = `<p class="ladder-hint">Just a sketch. Add colors, parts, and powers to unlock <b>${ART_TIERS.rare.icon} paint</b>.</p>`;
-  } else if (!(c.painting && c.paintedLevel === c.level)) {
-    hint = `<button class="btn btn-paint btn-small" type="button" id="paint">🎨 Paint it</button>`;
-  } else {
-    hint = nextId ? `<p class="ladder-hint">Add more to unlock <b>${ART_TIERS[nextId].icon} ${esc(ART_TIERS[nextId].label)}</b>.</p>` : `<p class="ladder-hint">🏆 Best art unlocked!</p>`;
-  }
-  box.innerHTML = `<div class="paint-box">${track}<div class="ladder-row">${hint}
-    ${c.painting && c.svg ? `<button class="link-btn" type="button" id="flip">${showsPainting(c) ? "See sketch" : "See painting"}</button>` : ""}</div>
+  if (!box || current !== c || paintingId === c.id) return;
+  const failed = canPaint() && c.paintError && artTierFor(c) !== "common" && !(c.painting && c.paintedLevel === c.level);
+  const flip = c.painting && c.svg;
+  if (!failed && !flip) return (box.innerHTML = "");
+  box.innerHTML = `<div class="paint-box">
+    ${
+      failed
+        ? `<p class="ladder-hint warn">${esc(c.paintError === "refused" ? LOOKALIKE_TIP : kidMessage({ code: c.paintError }))}</p>
+           ${c.paintError === "paint_limit" || c.paintError === "refused" ? "" : `<button class="btn btn-paint btn-small" type="button" id="paint">🎨 Try painting again</button>`}`
+        : ""
+    }
+    ${flip ? `<button class="link-btn" type="button" id="flip">${showsPainting(c) ? "See the sketch" : "See the painting"}</button>` : ""}
   </div>`;
   $("#paint", box)?.addEventListener("click", doPaint);
   $("#flip", box)?.addEventListener("click", () => {
@@ -282,28 +302,34 @@ async function doPaint() {
   }
 }
 
-async function evolve(addition) {
+// Evolving = improving the whole description, not tacking on more.
+async function evolve(description) {
   const c = current;
-  if (countWords(addition) < 2) {
+  if (description.replace(/\s+/g, " ") === c.description.replace(/\s+/g, " ")) {
     const err = $("#lab-error", root);
     err.hidden = false;
-    err.textContent = "Write a new detail for the artist first!";
+    err.textContent = "Change or add something in your description first!";
     sfx.fizzle();
     return;
   }
-  root.innerHTML = loadingHtml(`${c.name} is evolving... 🧬`);
-  const description = `${c.description} ${addition}`;
+  if (countWords(description) < 3) {
+    const err = $("#lab-error", root);
+    err.hidden = false;
+    err.textContent = "The artist needs at least a few words!";
+    sfx.fizzle();
+    return;
+  }
+  root.innerHTML = loadingHtml(`${c.name} is evolving… 🧬`);
   try {
     await detectBackend();
     const r = await ask("creature_create", {
       writerName: get().writerName,
       description,
       name: c.name,
-      addition,
       sketchOnlyIfCommon: canPaint(),
-      previous: { description: c.description, level: c.level, hp: c.hp, attack: c.attack, defense: c.defense, magic: c.magic, upgradeQuestion: c.upgradeQuestion },
+      previous: { description: c.description, level: c.level, hp: c.hp, attack: c.attack, defense: c.defense, magic: c.magic },
     });
-    logEvent("creature.evolve", { name: c.name, addition, words: countWords(addition), rarity: r.rarity, was: c.rarity, spells: r.spells.map((x) => x.id), question: c.upgradeQuestion });
+    logEvent("creature.evolve", { name: c.name, before: c.description, after: description, words: countWords(description) - countWords(c.description), stars: countStars(r.details), was: countStars(c.details), rarity: r.rarity, spells: r.spells.map((x) => x.id) });
     let next = {
       ...c,
       ...r,
@@ -321,14 +347,16 @@ async function evolve(addition) {
     next = withSketch(next);
     saveCreature(next);
     const rarityBonus = Math.max(5, RARITY_GEMS[next.rarity] - RARITY_GEMS[c.rarity]);
-    const result = award({ spells: r.spells, gems: rarityBonus, mode: "creature", text: addition });
+    const result = award({ spells: r.spells, gems: rarityBonus, mode: "creature", text: description });
     showCard();
     if (next.painting && next.paintedLevel === next.level) sfx.level();
     confetti(50);
     await showReward({ cheer: `${c.name} EVOLVED to level ${next.level}! ${r.artistNote}`, spells: r.spells, result, mood: "wow" });
   } catch (e) {
     showCard();
-    $("#evolve-text", root).value = addition;
+    const ta = $("#evolve-text", root);
+    ta.value = description;
+    ta.dispatchEvent(new Event("input"));
     const err = $("#lab-error", root);
     err.hidden = false;
     err.textContent = kidMessage(e);

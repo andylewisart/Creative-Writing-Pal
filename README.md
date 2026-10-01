@@ -108,22 +108,23 @@ Without a key the game still works. It uses simple word patterns to spot spells,
 
 `npm run build:artifact` builds a single HTML file that can be published as a claude.ai artifact. There the game runs on Claude through the viewer's Claude account, because claude.ai pages can't reach OpenAI. It has no painting and no voice coach. GitHub Pages is the main version now.
 
-## Painted creature art
+## Creature Lab: detail stars and painted art
 
-**The art gets cooler as the writing gets more detailed.** The card's rarity, which the AI judges from the description, picks what the child gets:
+The artist needs six things, shown as **detail stars**: ⭐ Body, Colors, Parts (wings, horns, tails, eyes), Powers, Sounds, and Home. Stars light up **while the child types**, and the star count decides the art:
 
-| Rarity | Art style |
-|---|---|
-| Common (bare-bones, or under 12 words) | 📐 only the AI's plain vector sketch, no painting, with a nudge to add details |
-| Rare | 🖌️ movie concept art: realistic textures, dramatic light |
-| Epic | 🎬 blockbuster monster-movie shot: huge scale, low camera angle, atmosphere |
-| Legendary | 🏆 the most epic cinematic reveal |
+| Stars | Rarity | What they get |
+|---|---|---|
+| 0–2 | Common | 📐 only a plain vector sketch, with a banner on it: "Just a sketch: 2 more ⭐ unlock a real painting!" |
+| 3 | Rare | 🖌️ a real painting (concept art) |
+| 4–5 | Epic | 🎬 a movie-poster painting |
+| 6 | Legendary | 🏆 the most epic cinematic reveal |
 
-- Rare and better go **straight to painting**: no sketch first. The creature's picture is shown large, with its name and rarity on top.
+- The AI decides which stars were really earned, quoting the child's words for each; the rarity follows the count, so the reward always matches the stars shown.
+- Rare and better go **straight to painting**, with no sketch first (and the model skips drawing an SVG, which saves time).
+- **Evolving means improving the whole description**: the result screen shows the child's own description in an editable box ("it is a big monster" → "it is a big purple monster with bat wings that roars"). Stars light up for new words as they edit, the message says what they'll unlock, and one hint question points at a missing star.
 - The painting prompt uses only the child's own words: anything they didn't describe stays plain.
-- Each creature level gets one painting. Evolving a creature (adding details) paints the new version, and the earlier sketch stays viewable.
+- OpenAI won't paint lookalikes of famous characters (a creature with dark scales and glowing blue back spikes gets blocked for looking like Godzilla). When that happens, Sparky explains that creature designers make theirs one-of-a-kind and suggests a twist; the sketch stays.
 - Paintings are shrunk to about 50 KB before saving. If storage fills up, the oldest paintings are dropped first; gems and books are never lost.
-- OpenAI won't paint lookalikes of famous characters. A creature with dark scales and glowing blue back spikes gets blocked for looking like Godzilla. When that happens, Sparky explains that real creature designers make theirs one-of-a-kind and suggests a Twist Spell, and the sketch stays. The AI's evolve question also nudges toward originality when a creature is a copy.
 
 ## Grown-ups corner
 

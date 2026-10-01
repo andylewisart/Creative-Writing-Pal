@@ -3,6 +3,7 @@
 // so both backends behave the same way.
 
 import { SPELL_IDS } from "./spells.js";
+import { DETAILS, DETAIL_IDS, rarityFromStars, countStars, STARS_FOR } from "./details.js";
 
 const wordCount = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
 
@@ -281,12 +282,11 @@ Writer's name: ${p.writerName}
 ${p.name ? `Creature name chosen by the writer: ${p.name}` : "The writer did not name it; invent a fun name based on the description."}
 ${
   p.previous
-    ? `This is an UPGRADE. Earlier description: "${p.previous.description}" (it was level ${p.previous.level}, stats HP ${p.previous.hp} / ATK ${p.previous.attack} / DEF ${p.previous.defense} / MAGIC ${p.previous.magic}).
-The writer answered the question "${p.previous.upgradeQuestion}" and added:
+    ? `This is an UPGRADE: the writer improved their description. Their earlier version was:
 """
-${p.addition}
+${p.previous.description}
 """
-Keep the same creature and name, add the new details, and raise the stats to reward the new details.`
+(It was level ${p.previous.level}, stats HP ${p.previous.hp} / ATK ${p.previous.attack} / DEF ${p.previous.defense} / MAGIC ${p.previous.magic}.) Keep the same creature and name, show the new details, and raise the stats to reward them.`
     : ""
 }
 Full description so far:
@@ -298,12 +298,13 @@ The big rule of Creature Lab: the Creature Artist draws ONLY what the writer des
 
 Return:
 - name, species (a fun 1-3 word kind of creature), element (one of the listed options), habitat (where it lives, from their words if given).
-- rarity (this also decides the art style the writer unlocks, so judge it fairly by the DESCRIPTION, not the creature's coolness): common = bare-bones, one or two plain details; rare = several concrete details (like colors plus body parts); epic = rich details across most of: body, colors, special parts, powers, sounds, home; legendary = epic-level detail plus vivid writing (comparisons, sounds, strong verbs) and a creative idea.
+- details: the six "detail stars" the artist needs. For each one, has = true only if the writer's OWN words clearly describe it, and quote = those words (empty string if not). Be fair to simple writing: "it is green" earns colors. The stars: ${DETAILS.map((d) => `${d.id} (${d.label.toLowerCase()}: ${d.hint})`).join("; ")}.
+- rarity: must follow the number of stars earned: 0-${STARS_FOR.rare - 1} common, ${STARS_FOR.rare} rare, ${STARS_FOR.epic}-${STARS_FOR.legendary - 1} epic, ${STARS_FOR.legendary} legendary. (The star count decides the art the writer unlocks.)
 - hp, attack, defense, magic: integers from 10 to 100. More vivid details mean higher stats. Upgrades always go up.
 - abilities: 1-3 abilities taken from their description, each with a cool name and a one-sentence effect.
-- spells: the spells in their writing (for an upgrade, only the newly added words).
+- spells: the spells in their writing (for an upgrade, only in words that are new compared with the earlier version).
 - artistNote: Sparky's comment (1-2 sentences) naming a detail that made the drawing better, plus one thing the artist had to guess.
-- upgradeQuestion: ONE curious question about a detail the artist could not draw yet. If the creature is basically a copy of a famous movie, TV, or game character, celebrate the idea and make this question invite a twist that makes it one-of-a-kind (the painter can't paint copies of famous characters).
+- upgradeQuestion: ONE short, curious question about a star they have NOT earned yet (or, with all six, about something that would make it even more vivid). If the creature is basically a copy of a famous movie, TV, or game character, celebrate the idea and make this question invite a twist that makes it one-of-a-kind (the painter can't paint copies of famous characters).
 - svg: ${p.sketchOnlyIfCommon ? "ONLY when you rate the rarity common, draw the quick sketch; for rare, epic, or legendary return an empty string, because a painter will paint it instead. When you do draw it, the" : "the"} drawing. Rules: a complete <svg> element with xmlns="http://www.w3.org/2000/svg" and viewBox="0 0 200 200"; bold, cool cartoon style (fierce is fine, never babyish) with dark outlines and flat colors; a simple background shape for the habitat; the creature centered and large; NO text, NO <script>, NO <image>, NO external links, NO filters or animation; under 5000 characters.`,
     schema: obj({
       name: str("creature name"),
@@ -313,6 +314,7 @@ Return:
         enum: ["fire", "water", "earth", "air", "lightning", "ice", "nature", "shadow", "light", "cosmic", "metal"],
       },
       habitat: str("where it lives"),
+      details: obj(Object.fromEntries(DETAIL_IDS.map((id) => [id, obj({ has: { type: "boolean" }, quote: str("the writer's words, or empty") })]))),
       rarity: { type: "string", enum: ["common", "rare", "epic", "legendary"] },
       hp: int("10-100"),
       attack: int("10-100"),
@@ -386,7 +388,8 @@ export const ART_TIERS = {
 
 const NEXT_TIER = { common: "rare", rare: "epic", epic: "legendary" };
 export const nextArtTier = (rarity) => NEXT_TIER[rarity] || null;
-export const artTierFor = (c) => (wordCount(c.description) < 12 ? "common" : ART_TIERS[c.rarity] ? c.rarity : "common");
+// The art style follows the card's rarity, which follows the detail stars.
+export const artTierFor = (c) => (ART_TIERS[c.rarity] ? c.rarity : "common");
 
 // The image-model prompt for a painted creature card. Built only from the
 // writer's own words: details they wrote show up, details they skipped stay plain.
@@ -520,7 +523,9 @@ export const NORMALIZE = {
     species: s(r.species, "Unknown Beast"),
     element: s(r.element, "cosmic"),
     habitat: s(r.habitat, "somewhere mysterious"),
-    rarity: ["common", "rare", "epic", "legendary"].includes(r.rarity) ? r.rarity : "common",
+    // The star count decides rarity, so the reward always matches the stars shown.
+    details: Object.fromEntries(DETAIL_IDS.map((id) => [id, { has: r.details?.[id]?.has === true, quote: s(r.details?.[id]?.quote) }])),
+    rarity: rarityFromStars(countStars(r.details)),
     hp: clampInt(r.hp, 10, 100, 30),
     attack: clampInt(r.attack, 10, 100, 30),
     defense: clampInt(r.defense, 10, 100, 30),

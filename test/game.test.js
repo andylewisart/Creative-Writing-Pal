@@ -90,8 +90,8 @@ test("demo replies normalize cleanly for every task", () => {
 
 test("paint prompt keeps the 'draws only what you write' rule and climbs the art ladder", async () => {
   const { paintPrompt, artTierFor } = await import("../public/js/prompts.js");
-  const plain = { description: "it is a monster", habitat: "somewhere mysterious", rarity: "epic" };
-  assert.equal(artTierFor(plain), "common", "a very short description is always a sketch");
+  const plain = { description: "it is a monster", habitat: "somewhere mysterious", rarity: "common" };
+  assert.equal(artTierFor(plain), "common");
   assert.match(paintPrompt(plain), /pencil sketch/);
   assert.match(paintPrompt(plain), /plain gray skin/);
   assert.match(paintPrompt(plain), /didn't say where it lives/);
@@ -125,4 +125,17 @@ test("revision prompt and voice instructions keep the teaching rules", async () 
   assert.match(v, /Fire Godzilla came from the ground/);
   assert.match(v, /personal information/);
   assert.match(v, /grown-up they trust/);
+});
+
+test("detail stars light up from the child's words and set the rarity", async () => {
+  const { detectDetails, countStars, rarityFromStars, nextUnlock } = await import("../public/js/details.js");
+  const poor = detectDetails("it is a big monster");
+  assert.equal(countStars(poor), 1);
+  assert.equal(rarityFromStars(countStars(poor)), "common");
+  assert.deepEqual(nextUnlock(1), { need: 2, icon: "🖌️", label: "a real painting" });
+  const rich = detectDetails("A giant purple monster with orange bat wings. It breathes blue fire, roars like thunder, and lives in a volcano.");
+  assert.equal(countStars(rich), 6);
+  assert.equal(rarityFromStars(6), "legendary");
+  const r = NORMALIZE.creature_create({ rarity: "legendary", details: { body: { has: true, quote: "big" } } });
+  assert.equal(r.rarity, "common", "rarity comes from the stars, not the model's word");
 });

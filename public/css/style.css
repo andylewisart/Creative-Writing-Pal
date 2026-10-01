@@ -538,3 +538,24 @@ button { font: inherit; cursor: pointer; }
 .brew-main { margin: 0; font-family: var(--font-display); font-weight: 900; font-size: 1.7rem; color: var(--text); }
 .brew-sub { margin: 0; color: var(--muted); }
 #paint-box .paint-box { justify-items: stretch; }
+
+/* ---------- Detail stars (Creature Lab) ---------- */
+.star-goal { display: grid; gap: 8px; justify-items: center; }
+.detail-stars { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; width: 100%; }
+.detail-stars li { display: grid; justify-items: center; gap: 1px; padding: 8px 2px; border-radius: 14px; background: var(--night-2); border: 2px solid transparent; color: var(--muted); font-size: .8rem; font-weight: 700; text-align: center; transition: background .25s, border-color .25s, color .25s; }
+.detail-stars .star { font-size: 1.35rem; line-height: 1; color: var(--muted); }
+.detail-stars .d-icon { font-size: 1.15rem; line-height: 1.2; opacity: .5; }
+.detail-stars li.lit { background: color-mix(in srgb, var(--star) 22%, var(--night-2)); border-color: var(--star); color: var(--text); }
+.detail-stars li.lit .d-icon { opacity: 1; }
+.detail-stars li.pop-star { animation: starPop .45s cubic-bezier(.2, 1.8, .4, 1); }
+@keyframes starPop { 0% { transform: scale(.7); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.star-msg { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; color: var(--star); text-align: center; min-height: 1.4em; }
+.lab .spell-lights, .lab-result .spell-lights { display: none; }
+.sketch-banner { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(86%, 420px); display: grid; gap: 4px; justify-items: center; text-align: center; padding: 14px 16px; border-radius: 18px; background: rgba(12, 10, 34, .82); border: 2px dashed var(--star); color: #fff; backdrop-filter: blur(3px); }
+.sketch-banner b { font-family: var(--font-display); font-size: 1.4rem; }
+.sketch-banner span { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; color: var(--star); }
+.evolve h2 { color: var(--text); }
+.evolve-hint { margin: 0; color: var(--muted); font-size: 1.05rem; text-align: center; }
+@media (max-width: 520px) {
+  .detail-stars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

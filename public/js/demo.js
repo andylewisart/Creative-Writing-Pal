@@ -2,6 +2,7 @@
 // It also powers the instant spell glow while the writer types.
 
 import { SPELLS } from "./spells.js";
+import { detectDetails, rarityFromStars, countStars } from "./details.js";
 
 const words = (list) => new RegExp(`\\b(${list.join("|")})\\b`, "i");
 
@@ -255,13 +256,15 @@ export function demoReply(task, p) {
       const prev = p.previous;
       const stat = (k, wobble) => Math.min(100, Math.max(prev ? prev[k] + 8 : 10, Math.round(base + wobble)));
       const element = ELEMENT_WORDS.find(([, re]) => re.test(description.toLowerCase()))?.[0] || "cosmic";
-      const rarity = words > 60 ? "legendary" : words > 35 ? "epic" : words > 15 ? "rare" : "common";
+      const details = detectDetails(description);
+      const rarity = rarityFromStars(countStars(details));
       return {
         name: p.name || prev?.name || "Blobsworth",
         species: element === "cosmic" ? "Mystery Beast" : `${element[0].toUpperCase()}${element.slice(1)} Beast`,
         element,
         habitat: /lives? (in|on|under|at) ([^.,!]+)/i.exec(description)?.[2] || "somewhere mysterious",
         rarity,
+        details,
         hp: stat("hp", 5),
         attack: stat("attack", -3),
         defense: stat("defense", 2),
