@@ -1,7 +1,7 @@
 import { get, update, stageFor, onChange } from "./state.js";
 import { detectBackend, backendKind } from "./ai.js";
 import { esc, el, $, sparkyHtml } from "./ui.js";
-import { sfx } from "./fx.js";
+import { sfx, stopSpeaking } from "./fx.js";
 import { logEvent } from "./log.js";
 import { stopVoice } from "./voice.js";
 import * as quest from "./modes/quest.js";
@@ -16,7 +16,7 @@ const bar = document.getElementById("topbar");
 const SCREENS = { hub, quest: quest.render, epic: epic.render, creature: creature.render, library: library.render, parents: parents.render };
 
 export function go(name, params = {}) {
-  window.speechSynthesis?.cancel();
+  stopSpeaking();
   stopVoice("left");
   logEvent("screen", { name, tab: params.tab });
   app.innerHTML = "";

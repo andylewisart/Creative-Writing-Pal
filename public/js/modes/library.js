@@ -114,8 +114,9 @@ function openBook(id) {
       return;
     }
     e.target.dataset.reading = "1";
-    e.target.textContent = "⏹ Stop reading";
+    e.target.textContent = "⏳ Getting ready…";
     speak(`${b.title}. By ${s.writerName}. ${b.story.map((p) => p.text).join(" ")} The End.`, {
+      onstart: () => (e.target.textContent = "⏹ Stop reading"),
       onend: () => {
         delete e.target.dataset.reading;
         e.target.textContent = "🔊 Read my whole book to me";

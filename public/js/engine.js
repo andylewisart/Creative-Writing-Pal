@@ -12,7 +12,22 @@ export const DEFAULTS = {
   imageSize: "1024x1024",
   voiceModel: "gpt-realtime-2.1",
   voiceName: "marin",
+  speechModel: "gpt-4o-mini-tts",
 };
+
+// Read-aloud voices: who reads, and how.
+export const SPEECH_STYLES = {
+  story: {
+    voice: "marin",
+    instructions:
+      "You are reading an adventure story aloud to an 8-year-old who loves monsters, dinosaurs, and space battles. Use a warm, lively storyteller voice with real drama: build suspense at cliffhangers, make sound words like KABOOM and ROAR punchy, and give characters a little voice when they speak. Clear and not rushed.",
+  },
+  trailer: {
+    voice: "onyx",
+    instructions: "Deep, booming movie-trailer announcer. Slow and epic, with dramatic pauses, like the biggest blockbuster of the year.",
+  },
+};
+export const SPEECH_MAX_CHARS = 3800;
 
 export class TaskError extends Error {
   constructor(code, message, status) {
@@ -107,6 +122,23 @@ export async function createVoiceSession({ openai, OpenAI, model = DEFAULTS.voic
       },
     });
     return { value: secret.value, model };
+  } catch (e) {
+    throw wrap(e, OpenAI);
+  }
+}
+
+// Read text aloud with OpenAI text-to-speech. Returns MP3 bytes (ArrayBuffer).
+export async function synthesizeSpeech({ openai, OpenAI, model = DEFAULTS.speechModel }, { text, style = "story" }) {
+  const st = SPEECH_STYLES[style] || SPEECH_STYLES.story;
+  try {
+    const res = await openai.audio.speech.create({
+      model,
+      voice: st.voice,
+      input: String(text).slice(0, SPEECH_MAX_CHARS),
+      instructions: st.instructions,
+      response_format: "mp3",
+    });
+    return await res.arrayBuffer();
   } catch (e) {
     throw wrap(e, OpenAI);
   }

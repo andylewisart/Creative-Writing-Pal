@@ -28,6 +28,7 @@ export function describe(e) {
     case "quest.abandon": return `Abandoned a story at part ${e.turn}: ${q(e.title)}`;
     case "spark": return `  Used the idea crystal${e.draft ? ` (draft ${q(e.draft)})` : ""}`;
     case "readaloud": return `  Listened to read-aloud`;
+    case "readaloud.fallback": return `  !! Read-aloud fell back to the basic voice (${e.code})`;
     case "epic.try": return `EPIC try ${e.tryNo} on ${q(e.boring)}: ${q(e.text)} => ${e.score}/10 (spells: ${spells(e.spells)})`;
     case "epic.trailer": return `  Played the movie-trailer voice`;
     case "creature.create": return `CREATURE (${e.words} words, ${e.rarity}): ${q(e.description)}`;

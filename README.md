@@ -41,6 +41,10 @@ What the child says shows up on screen as **"Your ideas"** notes to write from. 
 - The browser connects using a key that expires in 2 minutes. On the server version, your real OpenAI key never reaches the browser.
 - It needs a microphone, so it works on the github.io site and the self-hosted server, but not inside claude.ai.
 
+## 🔊 Read-aloud
+
+"Read to me" (story chapters and whole books) uses OpenAI's voice, `gpt-4o-mini-tts`, with directions for a warm, dramatic storyteller who makes sound words like KABOOM punchy. Boring-to-EPIC's movie-trailer button uses a deep announcer voice. Audio is generated per chapter (a few seconds), cached so replays are free, and read in chunks for long books. Without an OpenAI key, or if a request fails, it falls back to the browser's built-in voice.
+
 ## Activity log: see how your child actually plays
 
 Every step is recorded **on that device only**: each piece of writing (with how long it took), what Sparky said, which power-ups were woven in, tacked on, or skipped, voice-coach conversations, Epic scores, creature descriptions, and any errors. The **Grown-ups corner → Recent activity** section shows sessions as timelines. **📋 Copy report for Claude** produces a plain-text report you can paste into a chat with Claude to adjust the game around what your child really does.
@@ -97,6 +101,7 @@ Other devices on your Wi-Fi, like a tablet, can open `http://<this-computer's-IP
 | `OPENAI_VOICE_MODEL` | `gpt-realtime-2.1` | voice coach model (`gpt-realtime-2.1-mini` is cheaper) |
 | `OPENAI_VOICE` | `marin` | Sparky's voice |
 | `VOICE_SESSIONS_PER_DAY` | `20` | |
+| (read-aloud) | `gpt-4o-mini-tts` | voices `marin` (stories) and `onyx` (movie trailer), set in `public/js/engine.js` |
 
 Every story request uses strict structured output (the reply always matches the game's format) and `store: false`, so OpenAI doesn't keep your child's writing.
 

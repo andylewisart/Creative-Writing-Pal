@@ -2,7 +2,7 @@
 // grown-up saved on this device. Only loaded in that build.
 
 import OpenAI from "openai";
-import { runTextTask, paintCreature, createVoiceSession, TaskError } from "./engine.js";
+import { runTextTask, paintCreature, createVoiceSession, synthesizeSpeech, TaskError } from "./engine.js";
 import { getKeys } from "./keys.js";
 
 const PAINTS_PER_DAY = 25;
@@ -46,6 +46,8 @@ export async function directPaint(creature) {
 }
 
 export const directVoiceSession = (ctx) => createVoiceSession(client(), ctx);
+
+export const directSpeech = (text, style) => synthesizeSpeech(client(), { text, style });
 
 // A free check (listing models costs nothing) so a grown-up knows the key works.
 export async function checkKey() {

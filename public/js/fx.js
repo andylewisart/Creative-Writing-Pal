@@ -1,6 +1,8 @@
 // Sound, speech, confetti, and Sparky the dragon.
 
 import { get } from "./state.js";
+import { canSpeakAI, speechAudio } from "./ai.js";
+import { logEvent } from "./log.js";
 
 // ---------- Sound (tiny synth, no audio files) ----------
 let ctx = null;
@@ -43,6 +45,8 @@ export const sfx = {
 };
 
 // ---------- Speech ----------
+// Read-aloud uses OpenAI's voice (gpt-4o-mini-tts) when an OpenAI key is
+// available, and the browser's built-in voice otherwise or if that fails.
 let voice = null;
 function pickVoice() {
   if (!("speechSynthesis" in window)) return null;
@@ -58,22 +62,99 @@ if ("speechSynthesis" in window) {
   speechSynthesis.onvoiceschanged = () => (voice = pickVoice());
 }
 
-export const canSpeak = () => "speechSynthesis" in window;
+// One shared player, unlocked on the first tap so iPads allow read-aloud
+// to start later on its own (for example when a new chapter arrives).
+const player = typeof Audio !== "undefined" ? new Audio() : null;
+const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+if (player && typeof document !== "undefined") {
+  const unlock = () => {
+    player.src = SILENCE;
+    player.play().catch(() => {});
+    document.removeEventListener("pointerdown", unlock, true);
+  };
+  document.addEventListener("pointerdown", unlock, true);
+}
 
-export function speak(text, { pitch = 1, rate = 0.95, onend } = {}) {
-  if (!canSpeak()) return;
+const audioCache = new Map(); // "style|text" -> object URL, so replays are free
+let playId = 0; // bumps on every new speak/stop, so stale chunks never play
+
+export const canSpeak = () => "speechSynthesis" in window || canSpeakAI();
+
+// Split long text into chunks the speech API accepts, on sentence breaks.
+function chunks(text, max = 1500) {
+  const parts = [];
+  let cur = "";
+  for (const sentence of String(text).split(/(?<=[.!?])\s+/)) {
+    if ((cur + " " + sentence).length > max && cur) {
+      parts.push(cur);
+      cur = sentence;
+    } else cur = cur ? `${cur} ${sentence}` : sentence;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+async function audioFor(text, style) {
+  const key = `${style}|${text}`;
+  if (!audioCache.has(key)) {
+    const p = speechAudio(text, style).then((blob) => URL.createObjectURL(blob));
+    audioCache.set(key, p);
+    p.catch(() => audioCache.delete(key));
+  }
+  return audioCache.get(key);
+}
+
+function browserSpeak(text, { style, onend }) {
+  if (!("speechSynthesis" in window)) return onend?.();
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   voice = voice || pickVoice();
   if (voice) u.voice = voice;
-  u.pitch = pitch;
-  u.rate = rate;
-  if (onend) u.onend = onend;
+  u.pitch = style === "trailer" ? 0.55 : 1;
+  u.rate = style === "trailer" ? 0.85 : 0.95;
+  u.onend = () => onend?.();
   speechSynthesis.speak(u);
 }
 
+// speak(text, { style: "story" | "trailer", onstart, onend })
+export async function speak(text, { style = "story", onstart, onend } = {}) {
+  stopSpeaking();
+  const id = ++playId;
+  if (!canSpeakAI() || !player) {
+    onstart?.();
+    return browserSpeak(text, { style, onend });
+  }
+  const parts = chunks(text);
+  try {
+    let next = audioFor(parts[0], style);
+    for (let i = 0; i < parts.length; i++) {
+      const url = await next;
+      if (id !== playId) return;
+      if (i + 1 < parts.length) next = audioFor(parts[i + 1], style); // fetch ahead while this plays
+      player.src = url;
+      await player.play();
+      if (i === 0) onstart?.();
+      await new Promise((resolve, reject) => {
+        player.onended = resolve;
+        player.onerror = reject;
+        player.onpause = () => id !== playId && resolve();
+      });
+      if (id !== playId) return;
+    }
+    onend?.();
+  } catch (e) {
+    if (id !== playId) return;
+    if (e?.name === "NotAllowedError") return onend?.(); // the browser blocked autoplay; the button still works
+    logEvent("readaloud.fallback", { code: e?.code || e?.name || "error" });
+    onstart?.();
+    browserSpeak(text, { style, onend });
+  }
+}
+
 export function stopSpeaking() {
-  if (canSpeak()) speechSynthesis.cancel();
+  playId++;
+  if (player && !player.paused) player.pause();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
 }
 
 // ---------- Confetti ----------

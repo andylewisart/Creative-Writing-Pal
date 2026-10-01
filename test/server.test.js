@@ -190,3 +190,31 @@ test("voice endpoint mints a short-lived realtime key with the coaching instruct
     api.server.close();
   }
 });
+
+test("speech endpoint reads text aloud with the storyteller voice and returns mp3", async () => {
+  const server = http.createServer(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    server.seen = { url: req.url, body: JSON.parse(body) };
+    res.writeHead(200, { "content-type": "audio/mpeg" });
+    res.end(Buffer.from([0x49, 0x44, 0x33, 0x04]));
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const game = await startServer(server.address().port, 3916);
+  try {
+    const say = (body) => fetch("http://127.0.0.1:3916/api/speech", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const res = await say({ text: "KABOOM! The monster rose from the sea.", style: "story" });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "audio/mpeg");
+    assert.equal((await res.arrayBuffer()).byteLength, 4);
+    assert.match(server.seen.url, /\/v1\/audio\/speech$/);
+    assert.equal(server.seen.body.model, "gpt-4o-mini-tts");
+    assert.equal(server.seen.body.voice, "marin");
+    assert.match(server.seen.body.instructions, /storyteller/);
+    assert.equal((await say({ text: "", style: "story" })).status, 400);
+    assert.equal((await say({ text: "hi", style: "robot" })).status, 400);
+  } finally {
+    game.kill();
+    server.close();
+  }
+});

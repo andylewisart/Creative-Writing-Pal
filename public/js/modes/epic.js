@@ -139,7 +139,7 @@ async function judge(text) {
   }
   $("#trailer", root)?.addEventListener("click", () => {
     logEvent("epic.trailer");
-    speak(`${r.announcer} ... ${text}`, { pitch: 0.55, rate: 0.85 });
+    speak(`${r.announcer} ... ${text}`, { style: "trailer" });
   });
   $("#again", root).addEventListener("click", () => draw(text));
   $("#next", root).addEventListener("click", () => {

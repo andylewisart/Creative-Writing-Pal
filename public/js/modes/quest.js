@@ -159,18 +159,26 @@ function storyHtml(q) {
 const spellIcon = (id) => ({ sight: "🎨", sound: "💥", senses: "👃", talk: "💬", feelings: "💓", likea: "🪞", power: "⚡", twist: "🌀" })[id] || "✨";
 
 function wireReading(scope, q) {
+  const READ = "🔊 Read to me";
+  const reset = (x) => {
+    x.classList.remove("reading");
+    x.textContent = READ;
+  };
   $$("[data-read]", scope).forEach((b) =>
     b.addEventListener("click", () => {
       const part = q.story[Number(b.dataset.read)];
       if (b.classList.contains("reading")) {
         stopSpeaking();
-        b.classList.remove("reading");
-        return;
+        return reset(b);
       }
-      $$(".read-btn.reading", scope).forEach((x) => x.classList.remove("reading"));
+      $$(".read-btn.reading", scope).forEach(reset);
       b.classList.add("reading");
       logEvent("readaloud", { part: Number(b.dataset.read) });
-      speak(part.text, { onend: () => b.classList.remove("reading") });
+      b.textContent = "⏳ Getting ready…";
+      speak(part.text, {
+        onstart: () => (b.textContent = "⏹ Stop reading"),
+        onend: () => reset(b),
+      });
     }),
   );
 }

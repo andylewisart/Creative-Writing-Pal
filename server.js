@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
 import { TASKS } from "./public/js/prompts.js";
-import { DEFAULTS, runTextTask, paintCreature, createVoiceSession } from "./public/js/engine.js";
+import { DEFAULTS, runTextTask, paintCreature, createVoiceSession, synthesizeSpeech, SPEECH_STYLES, SPEECH_MAX_CHARS } from "./public/js/engine.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -153,6 +153,27 @@ async function handleVoice(req, res) {
   }
 }
 
+async function handleSpeech(req, res) {
+  if (!openai) return send(res, 503, { error: "No OPENAI_API_KEY set", code: "not_granted" });
+  let text, style;
+  try {
+    ({ text, style } = JSON.parse(await readBody(req, 20_000)));
+  } catch (e) {
+    return send(res, e.status || 400, { error: "Bad request body" });
+  }
+  if (typeof text !== "string" || !text.trim() || text.length > SPEECH_MAX_CHARS || !Object.hasOwn(SPEECH_STYLES, style || "story")) {
+    return send(res, 400, { error: "Bad speech request" });
+  }
+  try {
+    const audio = await synthesizeSpeech({ openai, OpenAI }, { text, style });
+    res.writeHead(200, { "content-type": "audio/mpeg", "cache-control": "no-store" });
+    res.end(Buffer.from(audio));
+  } catch (e) {
+    console.error("speech failed:", e.message);
+    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code: e.code || "default" });
+  }
+}
+
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   let rel = decodeURIComponent(url.pathname);
@@ -180,6 +201,7 @@ const server = http.createServer((req, res) => {
   if (pathname === "/api/ai" && req.method === "POST") return handleAI(req, res);
   if (pathname === "/api/paint" && req.method === "POST") return handlePaint(req, res);
   if (pathname === "/api/voice" && req.method === "POST") return handleVoice(req, res);
+  if (pathname === "/api/speech" && req.method === "POST") return handleSpeech(req, res);
   if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res);
   res.writeHead(405);
   res.end();

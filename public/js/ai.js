@@ -199,6 +199,32 @@ function shrink(src, size) {
   });
 }
 
+// OpenAI read-aloud is available wherever the OpenAI key is (not on claude.ai).
+export const canSpeakAI = () => voiceOn && !window.claude;
+
+// Read-aloud audio for `text` as an MP3 Blob. Throws AIError on failure.
+export async function speechAudio(text, style = "story") {
+  if (IS_STATIC_SITE) {
+    const { directSpeech } = await import("./direct.js");
+    try {
+      return new Blob([await directSpeech(text, style)], { type: "audio/mpeg" });
+    } catch (e) {
+      throw new AIError(e.code === "not_granted" ? "bad_key" : e.code || "default", e.message);
+    }
+  }
+  let res;
+  try {
+    res = await fetch("api/speech", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, style }) });
+  } catch (e) {
+    throw new AIError("network", e.message);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new AIError(body.code || "default", body.error || `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 // Start a voice-coach session: returns { value: short-lived key, model }.
 export async function voiceSession(ctx) {
   if (IS_STATIC_SITE) {
