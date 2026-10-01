@@ -6,6 +6,9 @@ import { WORLDS, HERO_KINDS, POWER_IDEAS } from "../worlds.js";
 import { esc, el, $, $$, writingDesk, wireDesk, showReward, challengeHtml, loadingHtml, spellChip, sparkyHtml, toast } from "../ui.js";
 import { sfx, speak, stopSpeaking, canSpeak, confetti } from "../fx.js";
 import { spellById } from "../spells.js";
+import { splitSentences } from "../demo.js";
+import { logEvent } from "../log.js";
+import { talkButtonHtml, wireTalk } from "../voice.js";
 
 let root, nav;
 
@@ -116,6 +119,7 @@ function setup() {
 }
 
 async function startStory(q) {
+  logEvent("quest.start", { world: q.worldId, hero: q.hero.name, kind: q.hero.kind, power: q.hero.power, turns: q.totalTurns });
   root.innerHTML = loadingHtml("Sparky is opening the story book...");
   try {
     const r = await ask("quest_start", payloadBase(q));
@@ -165,6 +169,7 @@ function wireReading(scope, q) {
       }
       $$(".read-btn.reading", scope).forEach((x) => x.classList.remove("reading"));
       b.classList.add("reading");
+      logEvent("readaloud", { part: Number(b.dataset.read) });
       speak(part.text, { onend: () => b.classList.remove("reading") });
     }),
   );
@@ -188,6 +193,7 @@ function writeTurn(draftText = "") {
         <div class="spark-box" id="spark-box" hidden></div>
         <p class="form-error" id="turn-error" role="alert" hidden></p>
         <div class="turn-actions">
+          ${talkButtonHtml()}
           <button class="btn btn-ghost" type="button" id="spark">🔮 Idea crystal</button>
           <button class="btn btn-go" type="button" id="cast">✨ Feed Sparky my words!</button>
         </div>
@@ -199,6 +205,7 @@ function writeTurn(draftText = "") {
   );
   wireReading(root, q);
   const ta = wireDesk($(".desk", root));
+  q.turnShownAt ||= Date.now();
   ta.addEventListener("input", () => {
     q.draft = ta.value;
   });
@@ -215,6 +222,16 @@ function writeTurn(draftText = "") {
   }
 
   $("#spark", root).addEventListener("click", () => sparkIdeas(q, ta));
+  wireTalk(root, ".desk", () => {
+    const lastAi = [...q.story].reverse().find((p) => p.author === "ai");
+    return {
+      kind: "quest",
+      writerName: get().writerName,
+      where: `Story Quest, part ${q.turn} of ${q.totalTurns} of a co-written adventure (${q.world}). Hero: ${q.hero.name}, ${q.hero.kind}. The newest chapter ends like this: "${(lastAi?.text || "").slice(-450)}". They are about to write what happens next.`,
+      draft: ta.value.trim(),
+      question: q.bonus?.prompt,
+    };
+  });
   $("#cast", root).addEventListener("click", () => submitTurn(q, ta.value.trim()));
   $("#quit", root).addEventListener("click", () => confirmQuit());
 }
@@ -232,6 +249,7 @@ async function sparkIdeas(q, ta) {
       draft: ta.value.trim(),
     });
     box.innerHTML = `<p class="spark-title">🔮 The crystal ball shows...</p><ul>${r.sparks.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`;
+    logEvent("spark", { mode: "quest", draft: ta.value.trim(), sparks: r.sparks });
     sfx.spell();
   } catch (e) {
     box.innerHTML = `<p class="spark-wait">${esc(kidMessage(e))}</p>`;
@@ -241,6 +259,7 @@ async function sparkIdeas(q, ta) {
 async function submitTurn(q, text) {
   const err = $("#turn-error", root);
   if (countWords(text) < 2) {
+    logEvent("quest.too_short", { turn: q.turn, text });
     err.hidden = false;
     err.textContent = "Sparky's tummy is rumbling! Write a little more first.";
     sfx.fizzle();
@@ -249,12 +268,16 @@ async function submitTurn(q, text) {
   stopSpeaking();
   const panel = $("#turn-panel", root);
   panel.innerHTML = loadingHtml("Sparky is tasting your words... nom nom nom");
+  logEvent("quest.submit", { turn: q.turn, of: q.totalTurns, text, words: countWords(text), secs: secsSince(q.turnShownAt), bonus: q.bonus?.spell });
+  q.turnShownAt = null;
   let r;
   try {
     r = await ask("quest_react", { ...payloadBase(q), story: q.story, kidText: text, bonus: q.bonus });
   } catch (e) {
+    logEvent("error", { where: "quest_react", code: e.code });
     return turnError(e, text);
   }
+  logEvent("quest.react", { turn: q.turn, cheer: r.cheer, spells: r.spells.map((x) => x.id), bonusDone: r.bonusDone, powerUp: r.powerUp.prompt });
   if (r.switchedToPractice) toast("Real magic isn't allowed here, so Sparky is using practice magic.");
   q.story.push({ author: "kid", text, spells: r.spells });
   q.draft = "";
@@ -264,24 +287,41 @@ async function submitTurn(q, text) {
   powerUpPanel(q, r.powerUp);
 }
 
-// The power-up: one question inviting one more detail.
-function powerUpPanel(q, powerUp) {
+// The power-up: revise ONE sentence of the writer's part, in place.
+// A worked example shows the move; if the detail gets tacked on as a
+// fragment ("...from the ground. Red fire"), Sparky offers a sentence
+// frame with blanks and one more try.
+function powerUpPanel(q, powerUp, attempt = 1, coach = null) {
+  const kidPart = q.story[q.story.length - 1];
+  const target = (q.revision ||= { target: pickTarget(kidPart.text, powerUp.target), shownAt: Date.now() }).target;
+  const spell = spellById[powerUp.spell] || spellById.sight;
+  const startText = coach?.frame || coach?.lastTry || target;
   root.innerHTML = "";
   root.appendChild(
     el(`<section class="quest">
       ${storyHtml(q)}
       <div class="turn-panel powerup" id="turn-panel">
         <div class="powerup-head">
-          ${sparkyHtml("wow", "small bounce")}
-          <div><span class="turn-count">⚡ Power-up chance! (+15 💎)</span>
-          <h2>${esc(powerUp.prompt)}</h2></div>
+          ${sparkyHtml(coach ? "happy" : "wow", "small bounce")}
+          <div><span class="turn-count">⚡ Power-up! Make one sentence stronger (+15 💎)</span>
+          <h2>${esc(coach ? coach.cheer : powerUp.prompt)}</h2></div>
         </div>
-        ${spellHint(powerUp.spell)}
-        ${writingDesk({ id: "addition", placeholder: "Add one more sentence to your part...", rows: 3, goal: 10 })}
+        ${
+          coach?.frame
+            ? `<div class="frame-help"><span class="label">Fill in the blanks with your own words:</span><p class="frame">${esc(coach.frame).replace(/_{3,}/g, '<span class="blank">___</span>')}</p></div>`
+            : `<div class="how-to" style="--spell:${spell.color}">
+                <span class="challenge-label">${spell.icon} How the ${esc(spell.name)} works</span>
+                <p class="demo-line"><span class="demo-before">${esc(spell.demo.before)}</span><span class="demo-arrow" aria-hidden="true">→</span><span class="demo-after">${spell.demo.after}</span></p>
+                <p class="demo-tip">See? The new words go <b>inside</b> the sentence.</p>
+              </div>`
+        }
+        <label class="label" for="revision">✏️ Change your sentence${coach?.frame ? " (replace the ___ blanks)" : ""}:</label>
+        ${writingDesk({ id: "revision", placeholder: target, rows: 2, goal: countWords(target) + 4, value: startText })}
         <p class="form-error" id="turn-error" role="alert" hidden></p>
         <div class="turn-actions">
+          ${talkButtonHtml()}
           <button class="btn btn-ghost" type="button" id="skip">Skip, keep going →</button>
-          <button class="btn btn-go" type="button" id="power">⚡ Power up my part!</button>
+          <button class="btn btn-go" type="button" id="power">⚡ Power up!</button>
         </div>
       </div>
     </section>`),
@@ -290,46 +330,91 @@ function powerUpPanel(q, powerUp) {
   const ta = wireDesk($(".desk", root));
   $("#turn-panel", root).scrollIntoView({ block: "start", behavior: "smooth" });
   ta.focus({ preventScroll: true });
-  $("#skip", root).addEventListener("click", () => continueStory(q, "", powerUp));
-  $("#power", root).addEventListener("click", () => {
-    const add = ta.value.trim();
-    if (countWords(add) < 2) {
-      const err = $("#turn-error", root);
-      err.hidden = false;
-      err.textContent = "Type your power-up first, or tap Skip.";
-      sfx.fizzle();
-      return;
+  const blank = ta.value.indexOf("___");
+  if (blank >= 0) ta.setSelectionRange(blank, blank + 3);
+  wireTalk(root, ".desk", () => ({
+    kind: "powerup",
+    writerName: get().writerName,
+    where: `Revising ONE sentence from their story to add a detail inside it. The sentence: "${target}".`,
+    draft: ta.value.trim(),
+    question: powerUp.prompt,
+  }));
+  logEvent("powerup.shown", { attempt, spell: powerUp.spell, question: powerUp.prompt, target, frame: coach?.frame });
+
+  const fail = (msg) => {
+    const err = $("#turn-error", root);
+    err.hidden = false;
+    err.textContent = msg;
+    sfx.fizzle();
+  };
+  $("#skip", root).addEventListener("click", () => {
+    logEvent("powerup.skip", { attempt, spell: powerUp.spell, secs: secsSince(q.revision.shownAt) });
+    q.revision = null;
+    continueStory(q, null);
+  });
+  $("#power", root).addEventListener("click", async () => {
+    const after = ta.value.trim();
+    if (after.includes("___")) return fail("Fill in the ___ blanks with your own words first!");
+    if (after.replace(/\s+/g, " ") === target.replace(/\s+/g, " ")) return fail("It's the same as before! Add a new detail somewhere inside your sentence.");
+    $("#turn-panel", root).innerHTML = loadingHtml("Sparky is checking your power-up...");
+    let r;
+    try {
+      r = await ask("quest_revise", { writerName: get().writerName, spell: powerUp.spell, prompt: powerUp.prompt, before: target, after, attempt });
+    } catch (e) {
+      logEvent("error", { where: "quest_revise", code: e.code });
+      powerUpPanel(q, powerUp, attempt, { ...coach, lastTry: after, frame: "" });
+      return fail(kidMessage(e));
     }
-    continueStory(q, add, powerUp);
+    logEvent("powerup.try", { attempt, before: target, after, woven: r.woven, changed: r.changed, cheer: r.cheer, frame: r.frame, spells: r.spells.map((x) => x.id) });
+    if (!r.changed) {
+      powerUpPanel(q, powerUp, attempt, { ...coach, lastTry: after, frame: coach?.frame || "" });
+      return fail(r.cheer);
+    }
+    if (!r.woven && attempt < 2) {
+      sfx.click();
+      return powerUpPanel(q, powerUp, attempt + 1, { cheer: r.cheer, frame: r.frame, lastTry: after });
+    }
+    // Put the revised sentence back into the writer's part.
+    const before = kidPart.text;
+    kidPart.text = before.includes(target) ? before.replace(target, after) : `${before} ${after}`;
+    kidPart.spells = mergeSpells(kidPart.spells, r.spells);
+    update((st) => (st.activeQuest = q));
+    const result = award({ spells: r.spells, gems: r.woven ? 15 : 5, mode: "powerup", text: after });
+    await showReward({ cheer: r.cheer, spells: r.spells, result, title: "Power-up spells!", mood: "wow" });
+    q.revision = null;
+    continueStory(q, before);
   });
 }
 
-async function continueStory(q, addition, powerUp) {
+// The sentence to revise: the AI's pick if it really is in the text, else the first one.
+function pickTarget(text, aiTarget) {
+  const t = String(aiTarget || "").trim();
+  if (t && text.includes(t)) return t;
+  return splitSentences(text)[0] || text;
+}
+
+const secsSince = (t) => (t ? Math.round((Date.now() - t) / 1000) : undefined);
+
+async function continueStory(q, revisedFrom) {
   const kidPart = q.story[q.story.length - 1];
-  if (addition) kidPart.text = `${kidPart.text} ${addition}`;
-  $("#turn-panel", root).innerHTML = loadingHtml(addition ? "Power-up absorbing... the story is growing!" : "The story is unfolding...");
+  $("#turn-panel", root).innerHTML = loadingHtml(revisedFrom ? "Power-up absorbing... the story is growing!" : "The story is unfolding...");
   let r;
   try {
     r = await ask("quest_continue", {
       ...payloadBase(q),
       story: q.story,
       kidText: kidPart.text,
-      addition,
-      powerUp: { prompt: powerUp.prompt },
+      revisedFrom,
       turnNumber: q.turn,
       totalTurns: q.totalTurns,
     });
   } catch (e) {
-    if (addition) kidPart.text = kidPart.text.slice(0, -(addition.length + 1));
+    logEvent("error", { where: "quest_continue", code: e.code });
     $("#turn-panel", root).innerHTML = `<div class="fizzle"><p>${esc(kidMessage(e))}</p><button class="btn btn-go" type="button" id="retry">Try again</button></div>`;
-    $("#retry", root).addEventListener("click", () => continueStory(q, addition, powerUp));
+    $("#retry", root).addEventListener("click", () => continueStory(q, revisedFrom));
     return;
   }
-  if (addition) {
-    kidPart.spells = mergeSpells(kidPart.spells, r.additionSpells);
-    const result = award({ spells: r.additionSpells, gems: 15, mode: "powerup", text: addition });
-    await showReward({ cheer: r.additionCheer || "Power-up absorbed! I'm glowing!", spells: r.additionSpells, result, title: "Power-up spells!", mood: "wow" });
-  }
+  logEvent("quest.chapter", { turn: q.turn, chapter: r.chapter, bonus: r.bonus.prompt });
   q.story.push({ author: "ai", text: r.chapter, emojis: r.sceneEmojis });
   q.bonus = r.bonus;
   q.justArrived = true;
@@ -341,15 +426,6 @@ async function continueStory(q, addition, powerUp) {
   q.turn += 1;
   update((s) => (s.activeQuest = q));
   writeTurn();
-}
-
-function spellHint(id) {
-  const s = spellById[id];
-  if (!s) return "";
-  return `<div class="challenge" style="--spell:${s.color}">
-    <span class="challenge-label">${s.icon} Try the ${esc(s.name)}</span>
-    <span class="challenge-text">${esc(s.teaches)} Like: <i class="kid-example">${esc(s.example)}</i></span>
-  </div>`;
 }
 
 function mergeSpells(a = [], b = []) {
@@ -376,6 +452,7 @@ function confirmQuit() {
     <button class="btn btn-small btn-danger" type="button" id="yes-quit">Yes, start over</button>
     <button class="btn btn-small btn-ghost" type="button" id="no-quit">Keep writing</button>`;
   $("#yes-quit", root).addEventListener("click", () => {
+    logEvent("quest.abandon", { turn: get().activeQuest?.turn, title: get().activeQuest?.title });
     update((s) => (s.activeQuest = null));
     setup();
   });
@@ -448,6 +525,7 @@ async function finale() {
       s.stories.unshift(book);
       s.activeQuest = null;
     });
+    logEvent("quest.finish", { title, words: kidWords, spells: kidSpells.length, favoriteLine: r.favoriteLine, mins: Math.round((Date.now() - (q.startedAt || Date.now())) / 60000) });
     const result = award({ gems: 50, mode: "finish" });
     await showReward({ cheer: `"${title}" is in your library! You're a real author now!`, spells: [], result, mood: "wow" });
     nav.go("library", { tab: "books", open: book.id });

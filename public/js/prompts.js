@@ -129,12 +129,48 @@ Return:
 - cheer: Sparky's excited reaction (1-3 sentences) that quotes or names something specific they wrote.
 - spells: the spells their newest part contains.
 - bonusDone: true if they cast the bonus challenge spell.
-- powerUp: ONE curious question inviting them to add one more detail to THIS part, using a spell they did not use yet. Keep it short and exciting, and make it about something they actually wrote.`,
+- powerUp: a revision challenge. Pick ONE sentence from their newest part (target: copy it exactly, character for character) and ONE spell they did not use yet that would make THAT sentence better. prompt: one short, exciting question about something in that sentence, phrased so the answer belongs INSIDE the sentence (for example "What color is Godzilla's fire? Put the color right before the word fire!"). The writer will edit that sentence in place.`,
     schema: obj({
       cheer: str("Sparky's specific, excited reaction"),
       spells: spellsArray,
       bonusDone: { type: "boolean" },
-      powerUp: challenge,
+      powerUp: obj({
+        spell: spellEnum,
+        prompt: str("one short question whose answer belongs inside the target sentence"),
+        target: str("one sentence copied exactly from the writer's newest part"),
+      }),
+    }),
+  },
+
+  quest_revise: {
+    tier: "default",
+    effort: "low",
+    build: (p) => `TASK: The writer is revising one sentence to power it up. Check how it went.
+
+Writer's name: ${p.writerName}
+The challenge (${p.spell} spell): "${p.prompt}"
+Their sentence BEFORE:
+"""
+${p.before}
+"""
+Their sentence AFTER:
+"""
+${p.after}
+"""
+This is try number ${p.attempt}.
+
+Decide:
+- changed: false if AFTER is the same as BEFORE or adds nothing.
+- woven: true if the new detail is part of a sentence that reads naturally (even if simple, misspelled, or a bit clunky). false if the new words were just tacked on as a fragment, like "Fire Godzilla came from the ground. Red fire." or a list of words at the end.
+- cheer: Sparky's reaction (1-2 sentences). If woven, quote the new words and say why the sentence got stronger. If not woven, celebrate the detail itself, then say it needs to move INSIDE the sentence. Never mention spelling or grammar.
+- frame: only when changed is true and woven is false: rewrite BEFORE as a sentence frame with ONE or TWO blanks written as ___ exactly where their detail would fit (for example "Fire Godzilla burst from the ground, blasting ___ fire."). Keep their words and only add a few connecting words. Otherwise an empty string.
+- spells: the spells in the new words they added (empty if none).`,
+    schema: obj({
+      changed: { type: "boolean" },
+      woven: { type: "boolean" },
+      cheer: str("Sparky's reaction to the revision"),
+      frame: str("a sentence frame with ___ blanks, or empty string"),
+      spells: spellsArray,
     }),
   },
 
@@ -161,22 +197,12 @@ The writer's newest part (already shown above as their last part):
 """
 ${p.kidText}
 """
-${
-  p.addition
-    ? `They powered up their part by adding this answer to the question "${p.powerUp?.prompt}":
-"""
-${p.addition}
-"""
-Give an additionCheer that names what they added, and list the spells in the addition only.`
-    : "They did not add a power-up, so additionCheer is an empty string and additionSpells is empty."
-}
+${p.revisedFrom ? `(They just revised one sentence in it to add detail. Their earlier version was: "${p.revisedFrom}". Build on the new details.)` : ""}
 
 This is turn ${p.turnNumber} of ${p.totalTurns}. ${pacing}
 Use at least three spells in your own writing. Pick three emojis that show the new scene, and a bonus challenge for their next part.`;
     },
     schema: obj({
-      additionCheer: str("Sparky's reaction to the power-up addition, or empty string"),
-      additionSpells: spellsArray,
       chapter: str("the next chapter text"),
       sceneEmojis: str("exactly three emojis that show the scene"),
       bonus: challenge,
@@ -311,6 +337,35 @@ Return:
   },
 };
 
+// Instructions for the spoken voice coach (OpenAI realtime). Kids say far
+// more than they write, so Sparky gets them talking about one moment in
+// rich detail, then sends them back to write it.
+export function voiceInstructions(ctx) {
+  return `You are Sparky, a friendly young dragon in the writing game "Story Quest", talking out loud with ${ctx.writerName || "a young writer"}, an 8-year-old 3rd grader who loves giant monsters, dinosaurs, and space battles. You are their writing coach. Your job: get them to TALK about one moment in rich detail, so they can then write a stronger sentence themselves.
+
+What they are working on right now:
+${ctx.where}
+${ctx.draft ? `What they have written so far: "${String(ctx.draft).slice(0, 600)}"` : "They haven't written anything for this part yet."}
+${ctx.question ? `The question they are thinking about: "${ctx.question}"` : ""}
+
+How to talk:
+- Keep every turn SHORT: one or two sentences, then ONE question. Sound excited and warm, like a fun older friend. Simple words.
+- Ask about details they can picture: what it looks like (color, size), what it sounds like, how it smells or feels, what a character says, how someone feels inside, what it is like ("as big as what?").
+- Use their own words back to them. Build on their ideas; never take over with your own story ideas.
+- Wait patiently. They may pause to think.
+- After 3 to 5 back-and-forths, or as soon as they have said something great, put THEIR ideas together into one sentence using their own words, say it back slowly, and tell them: "Now go write that down in your own words!" Then say a quick goodbye.
+
+Never:
+- Correct their grammar or pronunciation.
+- Write or dictate a long passage for them. One sentence made from their own words is the most you say back.
+- Ask for personal information (full name, school, address, or anything like that).
+- Describe gore, blood, or anything truly frightening. Big roaring monsters and epic battles are great.
+- Wander far off topic. If they chat about something else, enjoy it for one sentence, then steer back to the story.
+If they say something that sounds like they are hurt, unsafe, or very upset in real life, say kindly that it's important to tell a grown-up they trust right away.
+
+Start now: greet them in one short sentence and ask your first question about what they are working on.`;
+}
+
 // Painted art gets cooler as the writing gets more detailed. The card's
 // rarity (judged by Claude from the description) picks the art style.
 export const ART_TIERS = {
@@ -436,11 +491,16 @@ export const NORMALIZE = {
     cheer: s(r.cheer, "Chomp chomp! Those words were delicious!"),
     spells: cleanSpells(r.spells),
     bonusDone: r.bonusDone === true,
-    powerUp: cleanChallenge(r.powerUp),
+    powerUp: { ...cleanChallenge(r.powerUp), target: s(r.powerUp?.target) },
+  }),
+  quest_revise: (r) => ({
+    changed: r.changed !== false,
+    woven: r.woven === true,
+    cheer: s(r.cheer, "Ooh, a new detail!"),
+    frame: s(r.frame).includes("___") ? s(r.frame) : "",
+    spells: cleanSpells(r.spells),
   }),
   quest_continue: (r) => ({
-    additionCheer: s(r.additionCheer),
-    additionSpells: cleanSpells(r.additionSpells),
     chapter: s(r.chapter),
     sceneEmojis: s(r.sceneEmojis, "✨📖✨"),
     bonus: cleanChallenge(r.bonus),

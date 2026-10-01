@@ -4,6 +4,8 @@ import { get, update, resetAll } from "../state.js";
 import { SPELLS } from "../spells.js";
 import { detectBackend, backendKind, resetBackend } from "../ai.js";
 import { IS_STATIC_SITE, getKeys, setKeys, maskKey } from "../keys.js";
+import { sessions, summaryLine, describe, buildReport } from "../report.js";
+import { clearLog } from "../log.js";
 import { esc, el, $ } from "../ui.js";
 
 let root, nav;
@@ -74,6 +76,9 @@ async function dashboard() {
           : `<p class="p-note">Nothing written yet. Bars appear here as your child writes.</p>`
       }
 
+      <h2>Recent activity</h2>
+      ${activityHtml()}
+
       <h2>Writing moves used (spells)</h2>
       <div class="p-spells">${SPELLS.map(
         (sp) => `<div class="p-spell"><span>${sp.icon} ${esc(sp.name)}</span><div class="p-bar"><div style="width:${((s.spellCounts[sp.id] || 0) / maxSpell) * 100}%;background:${sp.color}"></div></div><b>${s.spellCounts[sp.id] || 0}</b><small>${esc(sp.teaches)}</small></div>`,
@@ -86,6 +91,9 @@ async function dashboard() {
         <select id="set-turns">${[3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${n === s.settings.questTurns ? "selected" : ""}>${n} writing turns</option>`).join("")}</select>
         <label for="set-sound">Sound effects</label><input type="checkbox" id="set-sound" ${s.settings.sound ? "checked" : ""}>
         <label for="set-read">Read new chapters aloud automatically</label><input type="checkbox" id="set-read" ${s.settings.readAloud ? "checked" : ""}>
+        <label for="set-voice">🎙️ Voice coach (needs an OpenAI key and a microphone)</label><input type="checkbox" id="set-voice" ${s.settings.voice !== false ? "checked" : ""}>
+        <label for="set-voice-min">Voice coach minutes per day</label>
+        <select id="set-voice-min">${[5, 10, 20, 30, 45].map((n) => `<option value="${n}" ${n === (s.settings.voiceMinutes ?? 20) ? "selected" : ""}>${n} minutes</option>`).join("")}</select>
       </div>
       <p class="p-note" id="saved-note" role="status"></p>
 
@@ -96,7 +104,8 @@ async function dashboard() {
       <h2>How the game teaches</h2>
       <div class="p-how">
         <p><b>Detail earns power.</b> Every mode rewards the same eight craft moves ("spells"): sensory detail, sound words, dialogue, feelings, comparisons, strong verbs, and twists. Gems, Sparky's growth, and creature stats all come from using them.</p>
-        <p><b>Revision is a power-up, not a correction.</b> After each story turn, Sparky asks one curious question about something your child wrote. Answering it adds a sentence to their part and earns bonus gems. That habit, going back to add a detail, is the heart of the game.</p>
+        <p><b>Revision is a power-up, not a correction.</b> After each story turn, Sparky picks one sentence your child wrote and asks one curious question about it. They edit that sentence in place, guided by a quick before-and-after example. If they tack the detail on the end ("…from the ground. Red fire."), Sparky celebrates the detail and offers a fill-in-the-blank frame built from their own sentence, so they learn where details go.</p>
+        <p><b>Talk first, then write.</b> With an OpenAI key, the 🎙️ voice coach lets your child talk an idea through with Sparky out loud. Kids can usually say much more than they can write. Their spoken ideas appear as notes to write from, and Sparky never dictates the writing.</p>
         <p><b>No red pen.</b> The AI never mentions spelling or grammar and never writes your child's part for them. Praise always quotes their actual words. The "Idea crystal" gives questions, not sentences to copy.</p>
         <p><b>Ways to help:</b> read the finished books together and ask about the favorite line. Try Creature Lab side by side: one of you writes a short description, the other a detailed one, and compare the drawings.</p>
       </div>
@@ -120,6 +129,8 @@ async function dashboard() {
   $("#set-turns", root).addEventListener("change", (e) => (update((st) => (st.settings.questTurns = Number(e.target.value))), saved()));
   $("#set-sound", root).addEventListener("change", (e) => (update((st) => (st.settings.sound = e.target.checked)), saved()));
   $("#set-read", root).addEventListener("change", (e) => (update((st) => (st.settings.readAloud = e.target.checked)), saved()));
+  $("#set-voice", root).addEventListener("change", (e) => (update((st) => (st.settings.voice = e.target.checked)), saved()));
+  $("#set-voice-min", root).addEventListener("change", (e) => (update((st) => (st.settings.voiceMinutes = Number(e.target.value))), saved()));
   $("#reset", root).addEventListener("click", () => {
     const zone = $("#danger", root);
     zone.innerHTML = `<span>This erases every book, creature, gem, and spell. It can't be undone.</span>
@@ -132,6 +143,7 @@ async function dashboard() {
     $("#reset-no", root).addEventListener("click", dashboard);
   });
 
+  wireActivity();
   if (IS_STATIC_SITE) wireConnect();
   await detectBackend();
   const status = $("#ai-status", root);
@@ -201,5 +213,56 @@ function wireConnect() {
     resetBackend();
     await dashboard();
     $("#key-note", root).textContent = "Keys removed from this device.";
+  });
+}
+
+function activityHtml() {
+  const list = sessions().slice(-6).reverse();
+  if (!list.length) return `<p class="p-note">Nothing recorded yet. Every story part, power-up, revision, and AI reply will show up here.</p>`;
+  const time = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `<p class="p-note">Everything is recorded on this device only. Tap a session to see each step. To tune the game, copy the report and paste it into a chat with Claude.</p>
+    <div class="sessions">${list
+      .map(
+        (sn, i) => `<details class="session" ${i === 0 ? "open" : ""}>
+          <summary><b>${esc(new Date(sn.start).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }))} ${esc(time(sn.start))}</b> · ${esc(summaryLine(sn))}</summary>
+          <ol class="timeline">${sn.events
+            .map((e) => [e, describe(e)])
+            .filter(([, d]) => d)
+            .map(([e, d]) => `<li class="${d.startsWith("  ") ? "sub" : ""} ${/!!/.test(d) ? "bad" : ""}"><time>${esc(time(e.t))}</time><span>${esc(d.trim())}</span></li>`)
+            .join("")}</ol>
+        </details>`,
+      )
+      .join("")}</div>
+    <div class="danger-zone" id="log-actions">
+      <button class="btn btn-small btn-go" type="button" id="copy-report">📋 Copy report for Claude</button>
+      <button class="btn btn-small btn-ghost" type="button" id="clear-log">Clear activity</button>
+    </div>
+    <textarea id="report-fallback" class="report-fallback" rows="8" readonly hidden></textarea>
+    <p class="p-note" id="log-note" role="status"></p>`;
+}
+
+function wireActivity() {
+  const note = () => $("#log-note", root);
+  $("#copy-report", root)?.addEventListener("click", async () => {
+    const text = buildReport();
+    try {
+      await navigator.clipboard.writeText(text);
+      note().textContent = "Copied! Paste it into a chat with Claude.";
+    } catch {
+      const ta = $("#report-fallback", root);
+      ta.hidden = false;
+      ta.value = text;
+      ta.focus();
+      ta.select();
+      note().textContent = "Your browser blocked copying, so the report is selected above. Copy it with Ctrl+C (or long-press → Copy).";
+    }
+  });
+  $("#clear-log", root)?.addEventListener("click", () => {
+    const zone = $("#log-actions", root);
+    zone.innerHTML = `<span>Clear the activity record? Books, creatures, and gems stay.</span>
+      <button class="btn btn-small btn-danger" type="button" id="clear-yes">Yes, clear it</button>
+      <button class="btn btn-small btn-ghost" type="button" id="clear-no">Cancel</button>`;
+    $("#clear-yes", root).addEventListener("click", () => (clearLog(), dashboard()));
+    $("#clear-no", root).addEventListener("click", dashboard);
   });
 }

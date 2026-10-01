@@ -2,13 +2,15 @@
 // github.io build (keys saved in the browser). Callers pass in the SDK
 // clients and classes, so this file has no imports a browser can't load.
 
-import { GUIDE, TASKS, paintPrompt } from "./prompts.js";
+import { GUIDE, TASKS, paintPrompt, voiceInstructions } from "./prompts.js";
 
 export const DEFAULTS = {
   model: "claude-opus-5-5",
   imageModel: "gpt-image-2.5-flare",
   imageQuality: "medium",
   imageSize: "1024x1024",
+  voiceModel: "gpt-realtime-2.1",
+  voiceName: "marin",
 };
 
 export class TaskError extends Error {
@@ -87,6 +89,38 @@ export async function paintCreature({ openai, OpenAI, model = DEFAULTS.imageMode
     let code = "default";
     if (e instanceof OpenAI.BadRequestError && /moderation|safety/i.test(String(e.code))) code = "refused";
     else if (e instanceof OpenAI.RateLimitError) code = "rate_limited";
+    else if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) code = "not_granted";
+    else if (e instanceof OpenAI.APIConnectionError) code = "network";
+    throw new TaskError(code, e.message, e.status);
+  }
+}
+
+// A short-lived key for one spoken coaching session (OpenAI realtime over
+// WebRTC). The browser uses it to connect; the real API key never leaves
+// wherever it is stored.
+export async function createVoiceSession({ openai, OpenAI, model = DEFAULTS.voiceModel, voice = DEFAULTS.voiceName }, ctx) {
+  try {
+    const secret = await openai.realtime.clientSecrets.create({
+      expires_after: { anchor: "created_at", seconds: 120 },
+      session: {
+        type: "realtime",
+        model,
+        instructions: voiceInstructions(ctx),
+        max_output_tokens: 800,
+        audio: {
+          input: {
+            transcription: { model: "gpt-4o-mini-transcribe", language: "en" },
+            // Kids pause to think; "low" eagerness waits for them to finish.
+            turn_detection: { type: "semantic_vad", eagerness: "low" },
+          },
+          output: { voice },
+        },
+      },
+    });
+    return { value: secret.value, model };
+  } catch (e) {
+    let code = "default";
+    if (e instanceof OpenAI.RateLimitError) code = "rate_limited";
     else if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) code = "not_granted";
     else if (e instanceof OpenAI.APIConnectionError) code = "network";
     throw new TaskError(code, e.message, e.status);

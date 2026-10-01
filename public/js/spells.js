@@ -4,6 +4,7 @@
 export const SPELLS = [
   {
     id: "sight",
+    demo: { before: "The ship landed.", after: "The <b>silver, spiky</b> ship landed." },
     name: "Color Spell",
     icon: "🎨",
     color: "#ff9f1c",
@@ -13,6 +14,7 @@ export const SPELLS = [
   },
   {
     id: "sound",
+    demo: { before: "The robot fell over.", after: "The robot fell over with a <b>loud CLANG!</b>" },
     name: "Sound Spell",
     icon: "💥",
     color: "#ff5d8f",
@@ -22,6 +24,7 @@ export const SPELLS = [
   },
   {
     id: "senses",
+    demo: { before: "The cave was dark.", after: "The cave was dark and <b>smelled like wet socks</b>." },
     name: "Senses Spell",
     icon: "👃",
     color: "#7bd389",
@@ -31,6 +34,7 @@ export const SPELLS = [
   },
   {
     id: "talk",
+    demo: { before: 'The knight saw the dragon.', after: 'The knight saw the dragon and <b>yelled, "Run!"</b>' },
     name: "Talking Spell",
     icon: "💬",
     color: "#3ddbd9",
@@ -40,6 +44,7 @@ export const SPELLS = [
   },
   {
     id: "feelings",
+    demo: { before: "Mia opened the box.", after: "Mia opened the box <b>with shaky, nervous hands</b>." },
     name: "Feelings Spell",
     icon: "💓",
     color: "#f78fb3",
@@ -49,6 +54,7 @@ export const SPELLS = [
   },
   {
     id: "likea",
+    demo: { before: "The dinosaur was big.", after: "The dinosaur was <b>as big as a school bus</b>." },
     name: "Like-a Spell",
     icon: "🪞",
     color: "#c39bff",
@@ -58,6 +64,7 @@ export const SPELLS = [
   },
   {
     id: "power",
+    demo: { before: "The car went down the hill.", after: "The car <b>zoomed</b> down the hill." },
     name: "Power-Word Spell",
     icon: "⚡",
     color: "#ffd23f",
@@ -67,6 +74,7 @@ export const SPELLS = [
   },
   {
     id: "twist",
+    demo: { before: "The monster ran away.", after: "The monster ran away, <b>but it left a glowing egg behind</b>." },
     name: "Twist Spell",
     icon: "🌀",
     color: "#5aa9ff",

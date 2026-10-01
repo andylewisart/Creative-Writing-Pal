@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { TASKS } from "./public/js/prompts.js";
-import { DEFAULTS, runClaudeTask, paintCreature } from "./public/js/engine.js";
+import { DEFAULTS, runClaudeTask, paintCreature, createVoiceSession } from "./public/js/engine.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -34,6 +34,9 @@ const painter = {
   size: process.env.OPENAI_IMAGE_SIZE || DEFAULTS.imageSize,
 };
 const PAINTS_PER_DAY = Number(process.env.PAINTS_PER_DAY) || 25;
+const voice = { openai, OpenAI, model: process.env.OPENAI_VOICE_MODEL || DEFAULTS.voiceModel, voice: process.env.OPENAI_VOICE || DEFAULTS.voiceName };
+const VOICE_SESSIONS_PER_DAY = Number(process.env.VOICE_SESSIONS_PER_DAY) || 20;
+const voiceCount = { day: "", n: 0 };
 const paintCount = { day: "", n: 0 };
 
 const TYPES = {
@@ -125,6 +128,31 @@ async function handlePaint(req, res) {
   }
 }
 
+async function handleVoice(req, res) {
+  if (!openai) return send(res, 503, { error: "No OPENAI_API_KEY set", code: "not_granted" });
+  let ctx;
+  try {
+    ({ ctx } = JSON.parse(await readBody(req, 20_000)));
+  } catch (e) {
+    return send(res, e.status || 400, { error: "Bad request body" });
+  }
+  if (!ctx || typeof ctx.where !== "string") return send(res, 400, { error: "Missing context" });
+  const today = new Date().toISOString().slice(0, 10);
+  if (voiceCount.day !== today) Object.assign(voiceCount, { day: today, n: 0 });
+  if (voiceCount.n >= VOICE_SESSIONS_PER_DAY) {
+    return send(res, 429, { error: `Daily voice limit (${VOICE_SESSIONS_PER_DAY}) reached`, code: "voice_limit" });
+  }
+  try {
+    const session = await createVoiceSession(voice, ctx);
+    voiceCount.n += 1;
+    console.log(`voice session started (${voiceCount.n}/${VOICE_SESSIONS_PER_DAY} today)`);
+    send(res, 200, session);
+  } catch (e) {
+    console.error("voice failed:", e.message);
+    send(res, e.status && e.status < 600 ? e.status : 500, { error: e.message, code: e.code || "default" });
+  }
+}
+
 function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   let rel = decodeURIComponent(url.pathname);
@@ -147,10 +175,11 @@ function serveStatic(req, res) {
 const server = http.createServer((req, res) => {
   const { pathname } = new URL(req.url, "http://localhost");
   if (pathname === "/api/status" && req.method === "GET") {
-    return send(res, 200, { live, model: live ? MODEL : null, paint: Boolean(openai) });
+    return send(res, 200, { live, model: live ? MODEL : null, paint: Boolean(openai), voice: Boolean(openai) });
   }
   if (pathname === "/api/ai" && req.method === "POST") return handleAI(req, res);
   if (pathname === "/api/paint" && req.method === "POST") return handlePaint(req, res);
+  if (pathname === "/api/voice" && req.method === "POST") return handleVoice(req, res);
   if (req.method === "GET" || req.method === "HEAD") return serveStatic(req, res);
   res.writeHead(405);
   res.end();

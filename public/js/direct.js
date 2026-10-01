@@ -3,7 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { runClaudeTask, paintCreature, TaskError } from "./engine.js";
+import { runClaudeTask, paintCreature, createVoiceSession, TaskError } from "./engine.js";
 import { getKeys } from "./keys.js";
 
 const PAINTS_PER_DAY = 25;
@@ -57,6 +57,12 @@ export async function directPaint(creature) {
     paintsToday(-1);
     throw e;
   }
+}
+
+export async function directVoiceSession(ctx) {
+  const { painter } = clients();
+  if (!painter) throw new TaskError("bad_key", "No OpenAI key saved");
+  return createVoiceSession({ openai: painter.openai, OpenAI }, ctx);
 }
 
 // Free checks (listing models costs nothing) so a grown-up knows the keys work.

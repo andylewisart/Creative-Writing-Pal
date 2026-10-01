@@ -102,3 +102,27 @@ test("paint prompt keeps the 'draws only what you write' rule and climbs the art
   assert.equal(artTierFor({ ...rich, rarity: "rare" }), "rare");
   assert.match(paintPrompt({ ...rich, rarity: "rare" }), /concept painting/);
 });
+
+test("practice-mode revision check catches tacked-on fragments like 'Red Fire'", async () => {
+  const before = "Fire Godzilla came from the ground.";
+  const check = (after) => NORMALIZE.quest_revise(demoReply("quest_revise", { before, after }));
+  const tacked = check("Fire Godzilla came from the ground. Red Fire");
+  assert.equal(tacked.woven, false);
+  assert.match(tacked.frame, /___/);
+  assert.equal(check("Fire Godzilla came from the ground blasting red fire.").woven, true);
+  assert.equal(check("Red Fire Godzilla came from the ground.").woven, true);
+  assert.equal(check(before).changed, false);
+});
+
+test("revision prompt and voice instructions keep the teaching rules", async () => {
+  const { voiceInstructions } = await import("../public/js/prompts.js");
+  const p = TASKS.quest_revise.build({ before: "A.", after: "A. Red", spell: "sight", prompt: "What color?", attempt: 1 });
+  assert.match(p, /tacked on/);
+  assert.match(p, /___/);
+  assert.match(TASKS.quest_react.build(quest), /target: copy it exactly/);
+  const v = voiceInstructions({ writerName: "Leo", where: "Story Quest", draft: "Fire Godzilla came from the ground.", question: "What color?" });
+  assert.match(v, /Leo/);
+  assert.match(v, /Fire Godzilla came from the ground/);
+  assert.match(v, /personal information/);
+  assert.match(v, /grown-up they trust/);
+});

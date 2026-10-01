@@ -166,3 +166,29 @@ test("paint endpoint maps a moderation block to a friendly refusal and doesn't c
     api.server.close();
   }
 });
+
+test("voice endpoint mints a short-lived realtime key with the coaching instructions", async () => {
+  const api = await fakeClaude(() => [200, { value: "ek_test", expires_at: 1 }]);
+  const game = await startPainter(api.port, 3915, { VOICE_SESSIONS_PER_DAY: "1" });
+  try {
+    const status = await (await fetch("http://127.0.0.1:3915/api/status")).json();
+    assert.equal(status.voice, true);
+    const post = (body) => fetch("http://127.0.0.1:3915/api/voice", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    assert.equal((await post({})).status, 400);
+    const res = await post({ ctx: { writerName: "Leo", where: "Story Quest part 1", draft: "Fire Godzilla came from the ground." } });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).value, "ek_test");
+    const req = api.seen[0];
+    assert.match(req.url, /\/v1\/realtime\/client_secrets/);
+    assert.equal(req.body.session.model, "gpt-realtime-2.1");
+    assert.equal(req.body.session.audio.input.turn_detection.type, "semantic_vad");
+    assert.match(req.body.session.instructions, /Fire Godzilla came from the ground/);
+    assert.ok(req.body.expires_after.seconds <= 600);
+    const capped = await post({ ctx: { where: "x" } });
+    assert.equal(capped.status, 429);
+    assert.equal((await capped.json()).code, "voice_limit");
+  } finally {
+    game.kill();
+    api.server.close();
+  }
+});

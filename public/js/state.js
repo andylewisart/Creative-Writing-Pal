@@ -24,7 +24,7 @@ function fresh() {
     creatures: [],
     epicBest: 0,
     log: [], // {t, mode, words, spells} one entry per thing written, for the grown-ups page
-    settings: { questTurns: 5, sound: true, readAloud: true },
+    settings: { questTurns: 5, sound: true, readAloud: true, voice: true, voiceMinutes: 20 },
   };
 }
 

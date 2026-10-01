@@ -6,6 +6,8 @@ import { ask, kidMessage, canPaint, paint, detectBackend } from "../ai.js";
 import { esc, el, $, writingDesk, wireDesk, spellChip, loadingHtml, sparkyHtml, showReward } from "../ui.js";
 import { sfx, confetti } from "../fx.js";
 import { ART_TIERS, artTierFor, nextArtTier } from "../prompts.js";
+import { logEvent } from "../log.js";
+import { talkButtonHtml, wireTalk } from "../voice.js";
 
 let root, nav;
 let current = null; // the creature being built
@@ -83,12 +85,20 @@ function designer() {
       ${writingDesk({ id: "creature-desc", placeholder: "My creature is...", rows: 6, goal: 40 })}
       <p class="form-error" id="lab-error" role="alert" hidden></p>
       <div class="turn-actions">
+        ${talkButtonHtml()}
         <button class="btn btn-go btn-big" type="button" id="draw">🖌️ Bring it to life!</button>
       </div>
     </section>`),
   );
   const ta = wireDesk($(".desk", root));
   $("#draw", root).addEventListener("click", () => create(ta.value.trim(), $("#creature-name", root).value.trim()));
+  wireTalk(root, ".desk", () => ({
+    kind: "creature",
+    writerName: get().writerName,
+    where: "Creature Lab: describing a made-up creature so the Creature Artist can draw it. The artist draws ONLY what they describe, so details make it awesome.",
+    draft: ta.value.trim(),
+    question: "What does your creature look like, sound like, and what can it do?",
+  }));
 }
 
 async function create(description, name) {
@@ -103,6 +113,7 @@ async function create(description, name) {
   try {
     const r = await ask("creature_create", { writerName: get().writerName, description, name });
     const c = { id: "c" + Date.now(), ...r, description, level: 1, createdAt: Date.now() };
+    logEvent("creature.create", { name: r.name, description, words: countWords(description), rarity: r.rarity, spells: r.spells.map((x) => x.id), question: r.upgradeQuestion });
     update((s) => s.creatures.unshift(c));
     current = c;
     const result = award({ spells: r.spells, gems: RARITY_GEMS[r.rarity], mode: "creature", text: description });
@@ -135,6 +146,7 @@ function showCard() {
         ${writingDesk({ id: "evolve-text", placeholder: "Add more details...", rows: 3, goal: 15 })}
         <p class="form-error" id="lab-error" role="alert" hidden></p>
         <div class="turn-actions">
+          ${talkButtonHtml()}
           <button class="btn btn-ghost" type="button" id="new">🥚 New creature</button>
           <button class="btn btn-go" type="button" id="evolve">🧬 Evolve it!</button>
         </div>
@@ -148,6 +160,13 @@ function showCard() {
     designer();
   });
   $("#evolve", root).addEventListener("click", () => evolve(ta.value.trim()));
+  wireTalk(root, ".upgrade-panel .desk", () => ({
+    kind: "creature-evolve",
+    writerName: get().writerName,
+    where: `Creature Lab: adding details to their creature ${c.name} so it evolves. What they wrote so far: "${c.description}".`,
+    draft: ta.value.trim(),
+    question: c.upgradeQuestion,
+  }));
   detectBackend().then(() => paintBox(c));
 }
 
@@ -200,6 +219,7 @@ async function doPaint() {
   sfx.click();
   try {
     const image = await paint({ name: c.name, description: c.description, habitat: c.habitat, rarity: c.rarity });
+    logEvent("creature.paint", { name: c.name, tier: artTierFor(c), ok: true });
     if (current?.id !== c.id) return;
     saveCreature({ ...current, painting: image, paintedLevel: current.level, paintedTier: artTierFor(c), view: undefined });
     showCard();
@@ -207,6 +227,7 @@ async function doPaint() {
     sfx.level();
     confetti(70);
   } catch (e) {
+    logEvent("creature.paint", { name: c.name, tier: artTierFor(c), ok: false, code: e.code });
     if (current?.id !== c.id) return;
     $(".card-art", root)?.classList.remove("painting");
     $("#evolve", root).disabled = false;
@@ -236,6 +257,7 @@ async function evolve(addition) {
       addition,
       previous: { description: c.description, level: c.level, hp: c.hp, attack: c.attack, defense: c.defense, magic: c.magic, upgradeQuestion: c.upgradeQuestion },
     });
+    logEvent("creature.evolve", { name: c.name, addition, words: countWords(addition), rarity: r.rarity, was: c.rarity, spells: r.spells.map((x) => x.id), question: c.upgradeQuestion });
     const next = {
       ...c,
       ...r,

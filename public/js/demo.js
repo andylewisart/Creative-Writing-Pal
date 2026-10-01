@@ -178,16 +178,34 @@ export function demoReply(task, p) {
         cheer: cheerFor(p.kidText, found, name),
         spells: found,
         bonusDone: found.some((f) => f.id === p.bonus?.spell),
-        powerUp: challengeFor(found),
+        powerUp: { ...challengeFor(found), target: splitSentences(p.kidText)[0] || p.kidText },
+      };
+    }
+    case "quest_revise": {
+      const before = String(p.before || "").trim();
+      const after = String(p.after || "").trim();
+      const added = newWords(before, after);
+      const changed = added.length > 0;
+      // Tacked on: the old sentence is still complete (end mark and all) with words hanging after it.
+      const rest = after.startsWith(before) ? after.slice(before.length).trim() : null;
+      const tackedOn = rest !== null && (/[.!?]$/.test(before) || /^[.!?]/.test(rest));
+      const woven = changed && !tackedOn;
+      return {
+        changed,
+        woven,
+        cheer: !changed
+          ? "Hmm, it looks the same! Add one new detail somewhere inside your sentence."
+          : woven
+            ? `POWER-UP! "${added.join(" ")}" made that sentence so much stronger!`
+            : `"${added.join(" ")}"! Great detail! Now let's tuck it INSIDE your sentence so it sounds like one big awesome sentence.`,
+        frame: changed && !woven ? `${before.replace(/[.!?]+$/, "")}, with ___ ___.` : "",
+        spells: detectSpells(added.join(" ")),
       };
     }
     case "quest_continue": {
       const h = heroOf(p);
       const left = p.totalTurns - p.turnNumber;
-      const addFound = p.addition ? detectSpells(p.addition) : [];
       return {
-        additionCheer: p.addition ? `Power-up absorbed! "${p.addition.slice(0, 40)}" made me glow!` : "",
-        additionSpells: addFound,
         chapter: left <= 0 ? ENDING(h) : left === 1 ? FINAL_SETUP(h) : NEXT_CHAPTERS[(p.turnNumber - 1) % NEXT_CHAPTERS.length](h),
         sceneEmojis: pick(["🌀🗝️✨", "🦊👀💥", "🍄🏰👑", "⚡🐉🌋", "🌙⭐🚀"]),
         bonus: challengeFor([]),
@@ -269,4 +287,16 @@ function shuffle(list) {
     .map((v) => [Math.random(), v])
     .sort((a, b) => a[0] - b[0])
     .map((x) => x[1]);
+}
+
+export function splitSentences(text) {
+  return String(text || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function newWords(before, after) {
+  const old = new Set(before.toLowerCase().match(/[a-z']+/g) || []);
+  return (after.match(/[A-Za-z']+/g) || []).filter((w) => !old.has(w.toLowerCase()));
 }

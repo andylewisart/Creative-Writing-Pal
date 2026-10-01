@@ -2,6 +2,7 @@ import { get, update, stageFor, onChange } from "./state.js";
 import { detectBackend, backendKind } from "./ai.js";
 import { esc, el, $, sparkyHtml } from "./ui.js";
 import { sfx } from "./fx.js";
+import { logEvent } from "./log.js";
 import * as quest from "./modes/quest.js";
 import * as epic from "./modes/epic.js";
 import * as creature from "./modes/creature.js";
@@ -15,6 +16,7 @@ const SCREENS = { hub, quest: quest.render, epic: epic.render, creature: creatur
 
 export function go(name, params = {}) {
   window.speechSynthesis?.cancel();
+  logEvent("screen", { name, tab: params.tab });
   app.innerHTML = "";
   app.dataset.screen = name;
   (SCREENS[name] || hub)(app, { go, params });
@@ -131,7 +133,7 @@ function onboarding(root) {
 }
 
 function start() {
-  detectBackend();
+  detectBackend().then(() => logEvent("app.open", { backend: backendKind(), width: window.innerWidth }));
   go("hub");
 }
 

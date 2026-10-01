@@ -23,9 +23,27 @@ Spells light up while the child types. Claude then confirms which ones they real
 
 ## Game modes
 
-- **🗺️ Story Quest**: pick a world (Kaiju Coast, Galaxy Rebellion, Dino Island, Dragon Kingdom...) and invent a hero. Claude writes a chapter that ends on a cliffhanger, the child writes what happens next, and they take turns. After each turn, Sparky asks **one** curious question ("What did the troll's roar sound like?"). Answering it is a **power-up** that adds a sentence to the child's part and earns bonus gems. This is revision, framed as a reward. Finished stories become books in the library, with a title, an award, and Sparky's favorite line.
+- **🗺️ Story Quest**: pick a world (Kaiju Coast, Galaxy Rebellion, Dino Island, Dragon Kingdom...) and invent a hero. Claude writes a chapter that ends on a cliffhanger, the child writes what happens next, and they take turns. After each turn comes a **power-up**: Sparky picks **one sentence the child wrote** and asks one question about it ("What color is Godzilla's fire?"). The child edits that sentence in place, with a quick before/after example of the move ("The ship landed." → "The **silver, spiky** ship landed."). If they tack the detail on the end instead ("Fire Godzilla came from the ground. Red Fire"), Sparky celebrates the detail and offers a fill-in-the-blank frame built from their sentence ("Fire Godzilla burst from the ground, blasting ___ fire.") for one more try. Finished stories become books in the library.
 - **⚡ Boring-to-EPIC**: the Boring-o-Tron 3000 shows a dull sentence ("The dog ran."). The child rewrites it and the Epic-o-meter scores it 1–10. Gems come only from beating your own best, so the fun is in revising. A movie-trailer voice reads the result aloud.
 - **🐲 Creature Lab**: describe a creature and get a collectible trading card with an AI drawing. The catch is that **the artist draws only what you write**. "A monster" gets you a plain blob; "purple scales, three glowing eyes, and bat wings" gets you a real beast with higher stats. Evolve the creature by answering the artist's question.
+
+## 🎙️ Voice coach: talk it out with Sparky (OpenAI key)
+
+Kids can usually say far more than they can write, so on the Story Quest, power-up, and Creature Lab screens a **🎙️ Talk it out with Sparky** button starts a short spoken conversation using OpenAI's realtime voice (`gpt-realtime-2.1`). Sparky:
+
+- asks one question at a time about details (looks, sounds, feelings, what someone says)
+- waits patiently while they think
+- after a few exchanges, says their own ideas back as one sentence and tells them to go write it
+
+What the child says shows up on screen as **"Your ideas"** notes to write from. Sparky never dictates the writing, never corrects grammar, never asks for personal information, and points them to a trusted grown-up if something sounds wrong in real life.
+
+- Sessions last up to 5 minutes. A daily limit (20 minutes by default) is set in the Grown-ups corner, where the voice coach can also be turned off.
+- The browser connects using a key that expires in 2 minutes. On the server version, your real OpenAI key never reaches the browser.
+- It needs a microphone, so it works on the github.io site and the self-hosted server, but not inside claude.ai.
+
+## Activity log: see how your child actually plays
+
+Every step is recorded **on that device only**: each piece of writing (with how long it took), what Sparky said, which power-ups were woven in, tacked on, or skipped, voice-coach conversations, Epic scores, creature descriptions, and any errors. The **Grown-ups corner → Recent activity** section shows sessions as timelines. **📋 Copy report for Claude** produces a plain-text report you can paste into a chat with Claude to adjust the game around what your child really does.
 
 ## Rules the AI follows
 
@@ -108,6 +126,9 @@ OPENAI_API_KEY=sk-proj-...
 | `OPENAI_IMAGE_QUALITY` | `medium` | `low` is cheaper; `high`, `xhigh`, `max` cost more |
 | `OPENAI_IMAGE_SIZE` | `1024x1024` | |
 | `PAINTS_PER_DAY` | `25` | |
+| `OPENAI_VOICE_MODEL` | `gpt-realtime-2.1` | voice coach model (`gpt-realtime-2.1-mini` is cheaper) |
+| `OPENAI_VOICE` | `marin` | Sparky's voice |
+| `VOICE_SESSIONS_PER_DAY` | `20` | |
 
 ### Option D: practice magic (no AI)
 
@@ -134,6 +155,9 @@ public/js/ai.js           picks the backend: claude.ai artifact, server, browser
 public/js/engine.js       the Claude and image-model calls (shared by server and github.io build)
 public/js/direct.js       github.io build: calls the APIs from the browser with saved keys
 public/js/keys.js         keys saved on this device (github.io build)
+public/js/voice.js        the voice coach (OpenAI realtime over WebRTC)
+public/js/log.js          the activity log (this device only)
+public/js/report.js       turns the log into sessions, timelines, and the copyable report
 public/js/demo.js         practice-mode magic + live spell lights
 public/js/state.js        saved progress (browser localStorage), gems, Sparky's levels
 public/js/modes/*.js      quest, epic, creature, library, grown-ups screens

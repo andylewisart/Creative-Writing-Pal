@@ -5,6 +5,7 @@ import { ask, kidMessage } from "../ai.js";
 import { BORING_SENTENCES } from "../worlds.js";
 import { esc, el, $, writingDesk, wireDesk, spellChip, challengeHtml, loadingHtml, sparkyHtml } from "../ui.js";
 import { sfx, speak, canSpeak, confetti } from "../fx.js";
+import { logEvent } from "../log.js";
 
 let root;
 let round = null; // { boring, tries: [{text, score}], best, spellsAwarded: [] }
@@ -86,6 +87,7 @@ async function judge(text) {
     return;
   }
   const prevBest = round.best;
+  logEvent("epic.try", { boring: round.boring, text, words: countWords(text), score: r.score, best: prevBest, tryNo: round.tries.length + 1, spells: r.spells.map((x) => x.id), cheer: r.cheer, next: r.nextSpell.prompt });
   round.tries.push({ text, score: r.score });
   round.best = Math.max(prevBest, r.score);
 
@@ -135,7 +137,10 @@ async function judge(text) {
     $(".epic-result", root).prepend(note);
     sfx.spell();
   }
-  $("#trailer", root)?.addEventListener("click", () => speak(`${r.announcer} ... ${text}`, { pitch: 0.55, rate: 0.85 }));
+  $("#trailer", root)?.addEventListener("click", () => {
+    logEvent("epic.trailer");
+    speak(`${r.announcer} ... ${text}`, { pitch: 0.55, rate: 0.85 });
+  });
   $("#again", root).addEventListener("click", () => draw(text));
   $("#next", root).addEventListener("click", () => {
     newRound();
